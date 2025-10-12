@@ -1,15 +1,14 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('script.js has loaded!');
 
-    // --- 1. FIREBASE CONFIGURATION (Analytics Removed) ---
+    // --- 1. FIREBASE CONFIGURATION ---
     const firebaseConfig = {
         apiKey: "AIzaSyC4dTEmXIiGDeIpPmug7D8z1DU2-ZE6kso",
         authDomain: "kbn-printz-store.firebaseapp.com",
         projectId: "kbn-printz-store",
-        storageBucket: "kbn-printz-store.appspot.com",
+        storageBucket: "kbn-printz-store.appspot.com", // Corrected domain
         messagingSenderId: "1067786431485",
         appId: "1:1067786431485:web:83e1db7c5880d952574794"
-        // measurementId has been removed as it's optional
     };
 
     // Initialize Firebase using the version 8 syntax
