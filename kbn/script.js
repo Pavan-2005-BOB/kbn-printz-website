@@ -1,7 +1,6 @@
 // script.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   // 🔥 Firebase configuration
@@ -11,14 +10,13 @@ document.addEventListener("DOMContentLoaded", () => {
     projectId: "kbn-printz-store",
     storageBucket: "kbn-printz-store.appspot.com",
     messagingSenderId: "1067786431485",
-    appId: "1:1067786431485:web:83e1db7c5880d952574794",
-    measurementId: "G-4SST0WTRMZ"
+    appId: "1:1067786431485:web:83e1db7c5880d952574794"
+    // measurementId removed
   };
 
   // 🚀 Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const analytics = getAnalytics(app);
   console.log("Firebase connected ✅");
 
   // =====================
@@ -29,34 +27,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const summaryItemsContainer = document.querySelector("#summaryItemsContainer");
   const shippingForm = document.querySelector("#shippingForm");
 
-  // Load cart from localStorage
   let cart = JSON.parse(localStorage.getItem(cartKey)) || [];
 
-  // Save cart
   function saveCart() {
     localStorage.setItem(cartKey, JSON.stringify(cart));
   }
 
-  // Update cart badge
   function updateCartIcon() {
     const count = cart.reduce((total, item) => total + item.quantity, 0);
     const cartBadge = document.querySelector("#cartCount");
     if (cartBadge) cartBadge.textContent = count;
   }
 
-  // Add item to cart
+  // Add to cart buttons
   document.querySelectorAll(".add-to-cart").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
       const name = btn.dataset.name;
       const price = parseFloat(btn.dataset.price);
-
       const existing = cart.find((item) => item.id === id);
-      if (existing) {
-        existing.quantity++;
-      } else {
-        cart.push({ id, name, price, quantity: 1 });
-      }
+
+      if (existing) existing.quantity++;
+      else cart.push({ id, name, price, quantity: 1 });
 
       saveCart();
       updateCartIcon();
@@ -64,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Render cart items
+  // Render cart
   function renderCart() {
     if (!cartItemsContainer) return;
     cartItemsContainer.innerHTML = "";
@@ -93,16 +85,13 @@ document.addEventListener("DOMContentLoaded", () => {
     renderSummary();
   }
 
-  // Render summary (subtotal, total)
+  // Render summary
   function renderSummary() {
     if (!summaryItemsContainer) return;
     summaryItemsContainer.innerHTML = "";
 
     let subtotal = 0;
-    cart.forEach((item) => {
-      subtotal += item.price * item.quantity;
-    });
-
+    cart.forEach((item) => subtotal += item.price * item.quantity);
     const shipping = subtotal > 0 ? 50 : 0;
     const total = subtotal + shipping;
 
@@ -113,7 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
-  // Handle quantity changes
+  // Quantity change
   document.addEventListener("input", (e) => {
     if (e.target.classList.contains("quantity-input")) {
       const index = e.target.dataset.index;
@@ -127,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Handle remove item
+  // Remove item
   document.addEventListener("click", (e) => {
     if (e.target.classList.contains("remove-btn")) {
       const index = e.target.dataset.index;
@@ -138,9 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // =====================
-  // 📦 CHECKOUT FORM
-  // =====================
+  // Checkout
   if (shippingForm) {
     shippingForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -178,9 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // =====================
-  // 🔄 INITIAL LOAD
-  // =====================
+  // Initial load
   renderCart();
   updateCartIcon();
 });
