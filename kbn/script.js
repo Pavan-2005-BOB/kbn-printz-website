@@ -466,9 +466,87 @@ function initializeCartPage() {
 }
 
 // --- CHECKOUT PAGE FUNCTIONALITY ---
+
 function initializeCheckoutPage() {
     const container = document.getElementById('summary-items-container');
     if (!container) return;
+    // Add this to your existing script.js in the checkout section
+
+// --- CHECKOUT PAGE FUNCTIONALITY ---
+function initializeCheckoutPage() {
+    const container = document.getElementById('summary-items-container');
+    if (!container) return;
+    
+    function renderOrderSummary() {
+        const cart = window.KBNPrintz?.cart();
+        const totalElement = document.getElementById('summary-total');
+        
+        if (!cart || cart.getItems().length === 0) {
+            container.innerHTML = '<p>No items in cart</p>';
+            if (totalElement) totalElement.textContent = '₹0.00';
+            
+            // Redirect to cart if empty
+            setTimeout(() => {
+                window.location.href = 'cart.html';
+            }, 1500);
+            return;
+        }
+        
+        container.innerHTML = cart.getItems().map(item => `
+            <div class="summary-item">
+                <span class="item-name">${item.name} × ${item.quantity}</span>
+                <span>${item.price}</span>
+            </div>
+        `).join('');
+        
+        if (totalElement) {
+            totalElement.textContent = `₹${cart.getTotal().toFixed(2)}`;
+        }
+    }
+    
+    // Handle form submission
+    const form = document.getElementById('shipping-form');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const cart = window.KBNPrintz?.cart();
+            if (!cart || cart.getItems().length === 0) {
+                showEnhancedNotification('Your cart is empty', 'error');
+                setTimeout(() => {
+                    window.location.href = 'cart.html';
+                }, 1500);
+                return;
+            }
+            
+            // Show loading state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Placing Order...';
+            submitBtn.disabled = true;
+            
+            try {
+                // Simulate order processing
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                showEnhancedNotification('Order placed successfully!', 'success');
+                cart.clear();
+                
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+                
+            } catch (error) {
+                showEnhancedNotification('Failed to place order', 'error');
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+    }
+    
+    renderOrderSummary();
+}
     
     function renderOrderSummary() {
         const cart = window.KBNPrintz?.cart();
