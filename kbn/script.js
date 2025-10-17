@@ -1,48 +1,8 @@
-// --- SAFE FIREBASE IMPORT WITH ERROR HANDLING ---
-let firebaseInitialized = false;
-
-async function loadFirebase() {
-    try {
-        // Check if Firebase is already loaded
-        if (typeof initializeApp !== 'undefined' && window.firebaseApp) {
-            console.log("Firebase already loaded, reusing existing instance");
-            return window.firebaseApp;
-        }
-
-        // Dynamically import Firebase v9
-        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js');
-        const { getFirestore } = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js');
-        
-        const firebaseConfig = {
-            apiKey: "AIzaSyC4dTEmXIiGDeIpPmug7D8z1DU2-ZE6kso",
-            authDomain: "kbn-printz-store.firebaseapp.com",
-            projectId: "kbn-printz-store",
-            storageBucket: "kbn-printz-store.appspot.com",
-            messagingSenderId: "1067786431485",
-            appId: "1:1067786431485:web:83e1db7c5880d952574794"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        
-        // Store globally to prevent re-initialization
-        window.firebaseApp = app;
-        window.firebaseDb = db;
-        firebaseInitialized = true;
-        
-        console.log("Firebase v9+ initialized successfully ✅");
-        return { app, db };
-    } catch (error) {
-        console.error("Firebase initialization failed:", error);
-        // Continue without Firebase - offline mode
-        return { app: null, db: null };
-    }
-}
-
 // --- GLOBAL VARIABLES ---
 let cart = null;
 let db = null;
 let app = null;
+let analytics = null;
 
 // --- ENHANCED NOTIFICATION SYSTEM ---
 function showEnhancedNotification(message, type = 'success', duration = 4000) {
@@ -91,6 +51,7 @@ function showEnhancedNotification(message, type = 'success', duration = 4000) {
                 align-items: center;
                 gap: 10px;
                 animation: slideInRight 0.3s ease;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             }
             .toast-success { background: #10b981; }
             .toast-error { background: #ef4444; }
@@ -103,7 +64,9 @@ function showEnhancedNotification(message, type = 'success', duration = 4000) {
                 cursor: pointer;
                 opacity: 0.7;
                 margin-left: auto;
+                padding: 4px;
             }
+            .toast-close:hover { opacity: 1; }
             @keyframes slideInRight {
                 from { transform: translateX(100%); opacity: 0; }
                 to { transform: translateX(0); opacity: 1; }
@@ -123,7 +86,7 @@ function showEnhancedNotification(message, type = 'success', duration = 4000) {
     return toast;
 }
 
-// --- SHOPPING CART CLASS (SIMPLIFIED) ---
+// --- SHOPPING CART CLASS ---
 class ShoppingCart {
     constructor() {
         this.items = JSON.parse(localStorage.getItem('shoppingCart')) || [];
@@ -143,25 +106,45 @@ class ShoppingCart {
         
         if (existingIndex > -1) {
             this.items[existingIndex].quantity += product.quantity;
+            showEnhancedNotification(`Updated quantity of ${product.name}`, 'success');
         } else {
             product.id = Date.now().toString();
             this.items.push(product);
+            showEnhancedNotification(`${product.quantity} x ${product.name} added to cart!`, 'success');
         }
         
         this.save();
-        showEnhancedNotification(`${product.quantity} x ${product.name} added to cart!`, 'success');
         return true;
     }
     
     removeItem(index) {
-        this.items.splice(index, 1);
+        if (index >= 0 && index < this.items.length) {
+            const removedItem = this.items[index];
+            this.items.splice(index, 1);
+            this.save();
+            showEnhancedNotification(`${removedItem.name} removed from cart`, 'warning');
+        }
+    }
+    
+    updateQuantity(index, newQuantity) {
+        if (index >= 0 && index < this.items.length && newQuantity > 0) {
+            this.items[index].quantity = newQuantity;
+            this.save();
+        } else if (newQuantity < 1) {
+            this.removeItem(index);
+        }
+    }
+    
+    clear() {
+        this.items = [];
         this.save();
-        showEnhancedNotification('Item removed from cart', 'warning');
+        showEnhancedNotification('Cart cleared', 'info');
     }
     
     save() {
         localStorage.setItem('shoppingCart', JSON.stringify(this.items));
         this.updateUI();
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
     }
     
     updateUI() {
@@ -180,6 +163,56 @@ class ShoppingCart {
             return total + (price * item.quantity);
         }, 0);
     }
+    
+    getItems() {
+        return this.items;
+    }
+}
+
+// --- FIREBASE CONFIGURATION ---
+const firebaseConfig = {
+    apiKey: "AIzaSyC4dTEmXIiGDeIpPmug7D8z1DU2-ZE6kso",
+    authDomain: "kbn-printz-store.firebaseapp.com",
+    projectId: "kbn-printz-store",
+    storageBucket: "kbn-printz-store.firebasestorage.app",
+    messagingSenderId: "1067786431485",
+    appId: "1:1067786431485:web:83e1db7c5880d952574794",
+    measurementId: "G-4SST0WTRMZ"
+};
+
+// --- FIREBASE LOADER ---
+async function loadFirebase() {
+    try {
+        // Check if Firebase is already available
+        if (window.firebaseApp) {
+            console.log("Firebase already loaded");
+            return { 
+                app: window.firebaseApp, 
+                db: window.firebaseDb,
+                analytics: window.firebaseAnalytics
+            };
+        }
+
+        // Dynamically import Firebase
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js');
+        const { getFirestore } = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js');
+        const { getAnalytics } = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-analytics.js');
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const analytics = getAnalytics(app);
+        
+        // Store globally
+        window.firebaseApp = app;
+        window.firebaseDb = db;
+        window.firebaseAnalytics = analytics;
+        
+        console.log("Firebase + Analytics initialized successfully ✅");
+        return { app, db, analytics };
+    } catch (error) {
+        console.log("Firebase not available, running in offline mode");
+        return { app: null, db: null, analytics: null };
+    }
 }
 
 // --- IMAGE UPLOAD HANDLER ---
@@ -193,6 +226,12 @@ function handleImageUpload(event, callback) {
         return;
     }
 
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+        showEnhancedNotification('Image must be smaller than 5MB', 'error');
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
         const img = new Image();
@@ -200,13 +239,17 @@ function handleImageUpload(event, callback) {
         img.onload = () => callback(img);
         img.onerror = () => showEnhancedNotification('Error loading image', 'error');
     };
+    reader.onerror = () => showEnhancedNotification('Error reading file', 'error');
     reader.readAsDataURL(file);
 }
 
 // --- CANVAS UTILITIES ---
 function initializeCanvas(canvasId) {
     const canvas = document.getElementById(canvasId);
-    if (!canvas) return null;
+    if (!canvas) {
+        console.error(`Canvas with id ${canvasId} not found`);
+        return null;
+    }
     
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
@@ -222,9 +265,15 @@ function initializeCanvas(canvasId) {
 function setupAddToCart() {
     document.addEventListener('click', (e) => {
         const addToCartBtn = e.target.closest('.btn-primary, #add-keychain-btn, #add-custom-frame-btn');
-        if (!addToCartBtn || !cart) return;
+        if (!addToCartBtn) return;
         
         e.preventDefault();
+        
+        // Check if cart is ready
+        if (!window.KBNPrintz || !window.KBNPrintz.cart()) {
+            showEnhancedNotification('Please wait, cart is loading...', 'warning');
+            return;
+        }
         
         const productElement = addToCartBtn.closest('.product-info, .editor-controls, .product-card');
         if (!productElement) {
@@ -234,7 +283,7 @@ function setupAddToCart() {
         
         const productInfo = extractProductInfo(productElement);
         if (productInfo) {
-            cart.addItem(productInfo);
+            window.KBNPrintz.cart().addItem(productInfo);
         }
     });
 }
@@ -243,14 +292,34 @@ function extractProductInfo(productElement) {
     try {
         const nameElement = productElement.querySelector('h1, h2, h3');
         const priceElement = productElement.querySelector('.product-price, .price');
-        const quantityInput = document.getElementById('quantity');
+        const quantityInput = document.getElementById('quantity') || productElement.querySelector('input[type="number"]');
+        
+        const productName = nameElement?.textContent?.trim() || 'Custom Product';
+        const productPrice = priceElement?.textContent?.trim() || '₹0.00';
+        const productQuantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
+        
+        // Check for custom product with image
+        const previewCanvas = document.getElementById('preview-canvas');
+        const imageUpload = document.getElementById('image-upload');
+        let productImage = '';
+        
+        if (previewCanvas && imageUpload && imageUpload.files.length > 0) {
+            productImage = previewCanvas.toDataURL('image/jpeg', 0.8);
+        } else {
+            const imgElement = productElement.querySelector('.product-image img, img');
+            if (imgElement) { 
+                productImage = imgElement.src; 
+            }
+        }
         
         return {
-            name: nameElement?.textContent?.trim() || 'Custom Product',
-            price: priceElement?.textContent?.trim() || '₹0.00',
-            quantity: quantityInput ? parseInt(quantityInput.value) || 1 : 1,
-            image: productElement.querySelector('img')?.src || '',
-            custom: !!document.getElementById('preview-canvas')
+            name: productName,
+            price: productPrice,
+            quantity: productQuantity,
+            image: productImage,
+            custom: !!previewCanvas,
+            requiresImage: !!imageUpload,
+            id: Date.now().toString()
         };
     } catch (error) {
         console.error('Error extracting product info:', error);
@@ -272,7 +341,6 @@ function initializeFrameEditor() {
     function drawFrame() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Draw placeholder or image
         if (uploadedImage) {
             ctx.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
         } else {
@@ -315,7 +383,6 @@ function initializeKeychainEditor() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         if (uploadedImage) {
-            // Simple centered image
             const ratio = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height) * 0.8;
             const width = uploadedImage.width * ratio;
             const height = uploadedImage.height * ratio;
@@ -345,28 +412,29 @@ function initializeKeychainEditor() {
 
 // --- CART PAGE FUNCTIONALITY ---
 function initializeCartPage() {
-    if (!document.getElementById('cart-items-container')) return;
+    const container = document.getElementById('cart-items-container');
+    if (!container) return;
     
     function renderCart() {
-        const container = document.getElementById('cart-items-container');
+        const cart = window.KBNPrintz?.cart();
         const emptyMessage = document.getElementById('empty-cart-message');
         const summary = document.getElementById('cart-summary');
         const subtotal = document.getElementById('cart-subtotal');
         
-        if (!cart || cart.items.length === 0) {
+        if (!cart || cart.getItems().length === 0) {
             container.innerHTML = '';
-            emptyMessage.style.display = 'block';
-            summary.style.display = 'none';
+            if (emptyMessage) emptyMessage.style.display = 'block';
+            if (summary) summary.style.display = 'none';
             return;
         }
         
-        emptyMessage.style.display = 'none';
-        summary.style.display = 'block';
+        if (emptyMessage) emptyMessage.style.display = 'none';
+        if (summary) summary.style.display = 'block';
         
-        container.innerHTML = cart.items.map((item, index) => `
+        container.innerHTML = cart.getItems().map((item, index) => `
             <div class="cart-item">
                 <div class="cart-item-image">
-                    <img src="${item.image || 'https://placehold.co/100x100/f8f9fa/6c757d?text=No+Image'}" alt="${item.name}">
+                    <img src="${item.image || 'https://placehold.co/100x100/f8f9fa/6c757d?text=No+Image'}" alt="${item.name}" loading="lazy">
                 </div>
                 <div class="cart-item-details">
                     <h3>${item.name}</h3>
@@ -374,50 +442,54 @@ function initializeCartPage() {
                 </div>
                 <div class="cart-item-quantity">
                     <input type="number" value="${item.quantity}" min="1" 
-                           onchange="cart.updateQuantity(${index}, parseInt(this.value))">
+                           onchange="window.KBNPrintz.cart().updateQuantity(${index}, parseInt(this.value))">
                 </div>
                 <div class="cart-item-price">
                     ${item.price}
                 </div>
-                <button class="remove-item-btn" onclick="cart.removeItem(${index})">
+                <button class="remove-item-btn" onclick="window.KBNPrintz.cart().removeItem(${index})">
                     ×
                 </button>
             </div>
         `).join('');
         
-        subtotal.textContent = `₹${cart.getTotal().toFixed(2)}`;
+        if (subtotal) {
+            subtotal.textContent = `₹${cart.getTotal().toFixed(2)}`;
+        }
     }
     
     // Render initial cart
     renderCart();
     
     // Update when cart changes
-    window.addEventListener('storage', renderCart);
     window.addEventListener('cartUpdated', renderCart);
 }
 
 // --- CHECKOUT PAGE FUNCTIONALITY ---
 function initializeCheckoutPage() {
-    if (!document.getElementById('summary-items-container')) return;
+    const container = document.getElementById('summary-items-container');
+    if (!container) return;
     
     function renderOrderSummary() {
-        const container = document.getElementById('summary-items-container');
+        const cart = window.KBNPrintz?.cart();
         const totalElement = document.getElementById('summary-total');
         
-        if (!cart || cart.items.length === 0) {
+        if (!cart || cart.getItems().length === 0) {
             container.innerHTML = '<p>No items in cart</p>';
-            totalElement.textContent = '₹0.00';
+            if (totalElement) totalElement.textContent = '₹0.00';
             return;
         }
         
-        container.innerHTML = cart.items.map(item => `
+        container.innerHTML = cart.getItems().map(item => `
             <div class="summary-item">
                 <span class="item-name">${item.name} × ${item.quantity}</span>
                 <span>${item.price}</span>
             </div>
         `).join('');
         
-        totalElement.textContent = `₹${cart.getTotal().toFixed(2)}`;
+        if (totalElement) {
+            totalElement.textContent = `₹${cart.getTotal().toFixed(2)}`;
+        }
     }
     
     // Handle form submission
@@ -426,20 +498,52 @@ function initializeCheckoutPage() {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (!cart || cart.items.length === 0) {
+            const cart = window.KBNPrintz?.cart();
+            if (!cart || cart.getItems().length === 0) {
                 showEnhancedNotification('Your cart is empty', 'error');
                 return;
             }
             
-            showEnhancedNotification('Order placed successfully!', 'success');
-            cart.clear();
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 2000);
+            // Show loading state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Placing Order...';
+            submitBtn.disabled = true;
+            
+            try {
+                // Simulate order processing
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                showEnhancedNotification('Order placed successfully!', 'success');
+                cart.clear();
+                
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+                
+            } catch (error) {
+                showEnhancedNotification('Failed to place order', 'error');
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
         });
     }
     
     renderOrderSummary();
+}
+
+// --- MOBILE NAVIGATION ---
+function initializeMobileNavigation() {
+    const navToggle = document.querySelector('.nav-toggle');
+    const mainNav = document.querySelector('.main-nav');
+    
+    if (navToggle && mainNav) {
+        navToggle.addEventListener('click', () => {
+            mainNav.classList.toggle('is-open');
+            navToggle.classList.toggle('is-open');
+        });
+    }
 }
 
 // --- MAIN INITIALIZATION ---
@@ -447,16 +551,10 @@ async function initializeKBNPrintz() {
     try {
         console.log('🚀 Initializing KBN Printz Store...');
         
-        // Initialize Firebase (optional - works offline too)
-        try {
-            const firebase = await loadFirebase();
-            app = firebase.app;
-            db = firebase.db;
-        } catch (error) {
-            console.log('Firebase not available, running in offline mode');
-        }
+        // Initialize mobile navigation first
+        initializeMobileNavigation();
         
-        // Initialize shopping cart
+        // Initialize shopping cart (doesn't depend on Firebase)
         cart = new ShoppingCart();
         
         // Initialize AOS animations
@@ -468,15 +566,23 @@ async function initializeKBNPrintz() {
             });
         }
         
-        // Mobile navigation
-        const navToggle = document.querySelector('.nav-toggle');
-        const mainNav = document.querySelector('.main-nav');
-        if (navToggle && mainNav) {
-            navToggle.addEventListener('click', () => {
-                mainNav.classList.toggle('is-open');
-                navToggle.classList.toggle('is-open');
-            });
+        // Try to initialize Firebase (optional)
+        try {
+            const firebase = await loadFirebase();
+            app = firebase.app;
+            db = firebase.db;
+            analytics = firebase.analytics;
+        } catch (error) {
+            console.log('Firebase initialization skipped - running in offline mode');
         }
+        
+        // Setup global access
+        window.KBNPrintz = {
+            cart: () => cart,
+            db: () => db,
+            analytics: () => analytics,
+            showNotification: showEnhancedNotification
+        };
         
         // Initialize page-specific functionality
         setupAddToCart();
@@ -489,15 +595,13 @@ async function initializeKBNPrintz() {
         
     } catch (error) {
         console.error('❌ Initialization error:', error);
-        showEnhancedNotification('Page loaded with limited functionality', 'warning');
+        showEnhancedNotification('Some features may not work properly', 'warning');
     }
 }
 
 // --- START APPLICATION ---
-document.addEventListener('DOMContentLoaded', initializeKBNPrintz);
-
-// --- GLOBAL ACCESS ---
-window.KBNPrintz = {
-    cart: () => cart,
-    showNotification: showEnhancedNotification
-};
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeKBNPrintz);
+} else {
+    initializeKBNPrintz();
+}
