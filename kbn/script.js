@@ -1,171 +1,213 @@
-// script.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
-import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+// --- 1. FIREBASE IMPORTS & CONFIGURATION ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-document.addEventListener("DOMContentLoaded", () => {
-  // 🔥 Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyB8zDdfyDmmLkPHAVObmsqIBYqQ8DSFjM4",
-    authDomain: "kbn-printz-store.firebaseapp.com",
-    projectId: "kbn-printz-store",
-    storageBucket: "kbn-printz-store.appspot.com",
-    messagingSenderId: "1067786431485",
-    appId: "1:1067786431485:web:83e1db7c5880d952574794"
-    // measurementId removed
-  };
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('script.js has loaded as a module!');
 
-  // 🚀 Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  console.log("Firebase connected ✅");
+    // --- PASTE YOUR FIREBASE CONFIGURATION OBJECT HERE ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyC4dTEmXIiGDeIpPmug7D8z1DU2-ZE6kso",
+        authDomain: "kbn-printz-store.firebaseapp.com",
+        projectId: "kbn-printz-store",
+        storageBucket: "kbn-printz-store.appspot.com", // CORRECTED
+        messagingSenderId: "1067786431485",
+        appId: "1:1067786431485:web:83e1db7c5880d952574794"
+    };
 
-  // =====================
-  // 🛒 CART MANAGEMENT
-  // =====================
-  const cartKey = "cartItems";
-  const cartItemsContainer = document.querySelector("#cartItemsContainer");
-  const summaryItemsContainer = document.querySelector("#summaryItemsContainer");
-  const shippingForm = document.querySelector("#shippingForm");
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    console.log("Firebase v9+ connected ✅");
 
-  let cart = JSON.parse(localStorage.getItem(cartKey)) || [];
-
-  function saveCart() {
-    localStorage.setItem(cartKey, JSON.stringify(cart));
-  }
-
-  function updateCartIcon() {
-    const count = cart.reduce((total, item) => total + item.quantity, 0);
-    const cartBadge = document.querySelector("#cartCount");
-    if (cartBadge) cartBadge.textContent = count;
-  }
-
-  // Add to cart buttons
-  document.querySelectorAll(".add-to-cart").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      const name = btn.dataset.name;
-      const price = parseFloat(btn.dataset.price);
-      const existing = cart.find((item) => item.id === id);
-
-      if (existing) existing.quantity++;
-      else cart.push({ id, name, price, quantity: 1 });
-
-      saveCart();
-      updateCartIcon();
-      alert(`${name} added to cart!`);
-    });
-  });
-
-  // Render cart
-  function renderCart() {
-    if (!cartItemsContainer) return;
-    cartItemsContainer.innerHTML = "";
-
-    if (cart.length === 0) {
-      cartItemsContainer.innerHTML = `<p>Your cart is empty 🛍️</p>`;
-      return;
+    // --- (All your other code remains the same) ---
+    if (typeof AOS !== 'undefined') {
+        AOS.init({ once: true, duration: 800 });
     }
 
-    cart.forEach((item, index) => {
-      const div = document.createElement("div");
-      div.classList.add("cart-item");
-      div.innerHTML = `
-        <div class="cart-info">
-          <span>${item.name}</span>
-          <span>₹${item.price.toFixed(2)}</span>
-        </div>
-        <div class="cart-actions">
-          <input type="number" min="1" value="${item.quantity}" data-index="${index}" class="quantity-input">
-          <button data-index="${index}" class="remove-btn">❌</button>
-        </div>
-      `;
-      cartItemsContainer.appendChild(div);
-    });
+    const navToggle = document.querySelector('.nav-toggle');
+    const mainNav = document.querySelector('#main-nav');
+    if (navToggle) {
+        navToggle.addEventListener('click', () => {
+            mainNav.classList.toggle('is-open');
+            navToggle.classList.toggle('is-open');
+        });
+    }
 
-    renderSummary();
-  }
+    function updateCartIcon() {
+        const cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+        const cartBadge = document.querySelector('.cart-badge');
+        let totalItems = 0;
+        cart.forEach(item => { totalItems += item.quantity; });
 
-  // Render summary
-  function renderSummary() {
-    if (!summaryItemsContainer) return;
-    summaryItemsContainer.innerHTML = "";
+        if (cartBadge) {
+            if (totalItems > 0) {
+                cartBadge.textContent = totalItems;
+                cartBadge.classList.add('show');
+            } else {
+                cartBadge.classList.remove('show');
+            }
+        }
+    }
 
-    let subtotal = 0;
-    cart.forEach((item) => subtotal += item.price * item.quantity);
-    const shipping = subtotal > 0 ? 50 : 0;
-    const total = subtotal + shipping;
+    const addToCartButton = document.querySelector('.product-actions .btn-primary, #add-keychain-btn, #add-custom-frame-btn');
+    if (addToCartButton) {
+      addToCartButton.addEventListener('click', () => {
+        const productInfo = addToCartButton.closest('.product-info, .editor-controls');
+        const productName = productInfo.querySelector('h1').textContent;
+        const productPrice = productInfo.querySelector('.product-price').textContent;
+        const quantityInput = document.getElementById('quantity');
+        const productQuantity = quantityInput ? parseInt(quantityInput.value) : 1;
 
-    summaryItemsContainer.innerHTML = `
-      <p>Subtotal: ₹${subtotal.toFixed(2)}</p>
-      <p>Shipping: ₹${shipping.toFixed(2)}</p>
-      <h4>Total: ₹${total.toFixed(2)}</h4>
-    `;
-  }
+        let productImage = '';
+        const previewCanvas = document.getElementById('preview-canvas') || document.getElementById('keychain-preview-canvas');
 
-  // Quantity change
-  document.addEventListener("input", (e) => {
-    if (e.target.classList.contains("quantity-input")) {
-      const index = e.target.dataset.index;
-      const newQty = parseInt(e.target.value);
-      if (newQty > 0) {
-        cart[index].quantity = newQty;
-        saveCart();
-        renderCart();
+        if (previewCanvas && document.getElementById('image-upload') && document.getElementById('image-upload').files.length > 0) {
+            productImage = previewCanvas.toDataURL('image/jpeg');
+        } else {
+            const imgElement = document.querySelector('.product-image img');
+            if (imgElement) { productImage = imgElement.src; }
+        }
+
+        if ((document.getElementById('image-upload')) && !productImage) {
+            alert('Please upload an image before adding to cart!');
+            return;
+        }
+
+        let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+        const existingProductIndex = cart.findIndex(item => item.name === productName && !item.custom);
+
+        if (existingProductIndex > -1) {
+            cart[existingProductIndex].quantity += productQuantity;
+        } else {
+            const productToAdd = {
+                name: productName,
+                price: productPrice,
+                quantity: productQuantity,
+                image: productImage,
+                custom: !!previewCanvas,
+                baseprice: productInfo.querySelector('.product') ? productInfo.querySelector('.product').textContent.trim() : null
+            };
+            cart.push(productToAdd);
+        }
+
+        localStorage.setItem('shoppingCart', JSON.stringify(cart));
+        alert(`${productQuantity} x ${productName} has been added to your cart!`);
         updateCartIcon();
-      }
+      });
     }
-  });
 
-  // Remove item
-  document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("remove-btn")) {
-      const index = e.target.dataset.index;
-      cart.splice(index, 1);
-      saveCart();
-      renderCart();
-      updateCartIcon();
+    const cartItemsContainer = document.getElementById('cart-items-container');
+    function renderCart() {
+        if (!cartItemsContainer) return;
+        const cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+        const emptyCartMessage = document.getElementById('empty-cart-message');
+        const cartSummary = document.getElementById('cart-summary');
+        const cartSubtotalEl = document.getElementById('cart-subtotal');
+        let subtotal = 0;
+
+        cartItemsContainer.innerHTML = '';
+
+        if (cart.length === 0) {
+            emptyCartMessage.style.display = 'block';
+            cartSummary.style.display = 'none';
+        } else {
+            emptyCartMessage.style.display = 'none';
+            cartSummary.style.display = 'flex';
+            cart.forEach((product, index) => {
+                const priceAsNumber = parseFloat(product.price.replace('₹', ''));
+                const itemTotal = priceAsNumber * product.quantity;
+                subtotal += itemTotal;
+                const cartItemHTML = `<div class="cart-item"><div class="cart-item-image"><img src="${product.image}" alt="${product.name}"></div><div class="cart-item-details"><h3>${product.name}</h3>${product.baseprice ? `<p class="base-price-text">${product.baseprice}</p>` : ''}<p>Price: ${product.price}</p></div><div class="cart-item-quantity"><input type="number" value="${product.quantity}" min="1" data-index="${index}"></div><p class="cart-item-price">₹${itemTotal.toFixed(2)}</p><button class="remove-item-btn" data-index="${index}">&times;</button></div>`;
+                cartItemsContainer.innerHTML += cartItemHTML;
+            });
+            cartSubtotalEl.textContent = `₹${subtotal.toFixed(2)}`;
+        }
     }
-  });
 
-  // Checkout
-  if (shippingForm) {
-    shippingForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const name = shippingForm.querySelector("#name").value.trim();
-      const address = shippingForm.querySelector("#address").value.trim();
-      const phone = shippingForm.querySelector("#phone").value.trim();
-
-      if (cart.length === 0) {
-        alert("Your cart is empty!");
-        return;
-      }
-
-      const order = {
-        name,
-        address,
-        phone,
-        items: cart,
-        total: cart.reduce((sum, item) => sum + item.price * item.quantity, 0) + 50,
-        createdAt: new Date().toISOString(),
-      };
-
-      try {
-        await addDoc(collection(db, "orders"), order);
-        alert("✅ Order placed successfully!");
-        localStorage.removeItem(cartKey);
-        cart = [];
+    if (cartItemsContainer) {
         renderCart();
-        updateCartIcon();
-        shippingForm.reset();
-      } catch (error) {
-        console.error("❌ Error saving order:", error);
-        alert("Failed to place order. Please try again.");
-      }
-    });
-  }
+        cartItemsContainer.addEventListener('click', (event) => {
+            if (event.target.classList.contains('remove-item-btn')) {
+                let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+                cart.splice(event.target.dataset.index, 1);
+                localStorage.setItem('shoppingCart', JSON.stringify(cart));
+                renderCart();
+                updateCartIcon();
+            }
+        });
+        cartItemsContainer.addEventListener('change', (event) => {
+            if (event.target.matches('input[type="number"]')) {
+                let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+                const index = event.target.dataset.index;
+                const newQuantity = parseInt(event.target.value);
+                if (newQuantity > 0) {
+                    cart[index].quantity = newQuantity;
+                } else {
+                    cart.splice(index, 1);
+                }
+                localStorage.setItem('shoppingCart', JSON.stringify(cart));
+                renderCart();
+                updateCartIcon();
+            }
+        });
+    }
 
-  // Initial load
-  renderCart();
-  updateCartIcon();
+    // --- Checkout Page Logic (UPGRADED FOR FIREBASE V9+) ---
+    const summaryItemsContainer = document.getElementById('summary-items-container');
+    if (summaryItemsContainer) {
+        const cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+        const summaryTotalEl = document.getElementById('summary-total');
+        let subtotal = 0;
+
+        if (cart.length > 0) {
+            cart.forEach(product => {
+                const priceAsNumber = parseFloat(product.price.replace('₹', ''));
+                const itemTotal = priceAsNumber * product.quantity;
+                subtotal += itemTotal;
+                const summaryItemHTML = `<div class="summary-item"><span class="item-name">${product.name} (x${product.quantity})</span><span class="item-price">₹${itemTotal.toFixed(2)}</span></div>`;
+                summaryItemsContainer.innerHTML += summaryItemHTML;
+            });
+            summaryTotalEl.textContent = `₹${subtotal.toFixed(2)}`;
+        }
+
+        const shippingForm = document.getElementById('shipping-form');
+        shippingForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            if (cart.length === 0) {
+                alert("Your cart is empty. Please add items before placing an order.");
+                return;
+            }
+
+            const shippingDetails = {
+                name: document.getElementById('full-name').value,
+                email: document.getElementById('email').value,
+                address: document.getElementById('address').value,
+                phone: document.getElementById('phone').value,
+            };
+
+            const order = {
+                shipping: shippingDetails,
+                items: cart,
+                total: subtotal,
+                createdAt: new Date()
+            };
+
+            try {
+                // Save the order to a new "orders" collection in Firestore
+                await addDoc(collection(db, "orders"), order);
+                
+                localStorage.removeItem('shoppingCart');
+                alert('Order placed successfully! Thank you for your purchase.');
+                window.location.href = 'thank-you.html';
+
+            } catch (error) {
+                console.error("Error writing document: ", error);
+                alert("There was an error placing your order. Please try again.");
+            }
+        });
+    }
+
+    updateCartIcon();
 });
