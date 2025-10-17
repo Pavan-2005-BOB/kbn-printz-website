@@ -1,26 +1,13 @@
 // --- 1. FIREBASE IMPORTS & CONFIGURATION ---
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+// Note: These imports are now handled by loading the script as a module
+// import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+// import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('script.js has loaded as a module!');
+    console.log('script.js has loaded!');
 
-    // --- PASTE YOUR FIREBASE CONFIGURATION OBJECT HERE ---
-    const firebaseConfig = {
-        apiKey: "AIzaSyC4dTEmXIiGDeIpPmug7D8z1DU2-ZE6kso",
-        authDomain: "kbn-printz-store.firebaseapp.com",
-        projectId: "kbn-printz-store",
-        storageBucket: "kbn-printz-store.appspot.com", // CORRECTED
-        messagingSenderId: "1067786431485",
-        appId: "1:1067786431485:web:83e1db7c5880d952574794"
-    };
-
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    console.log("Firebase v9+ connected ✅");
-
-    // --- (All your other code remains the same) ---
+    // --- (All your existing code for AOS, Menu, Cart, etc. goes below) ---
+    // Note: AOS is not loaded on every page, so we add a check for it.
     if (typeof AOS !== 'undefined') {
         AOS.init({ once: true, duration: 800 });
     }
@@ -50,32 +37,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // --- ADD TO CART LOGIC (Handles all pages) ---
     const addToCartButton = document.querySelector('.product-actions .btn-primary, #add-keychain-btn, #add-custom-frame-btn');
     if (addToCartButton) {
       addToCartButton.addEventListener('click', () => {
         const productInfo = addToCartButton.closest('.product-info, .editor-controls');
-        const productName = productInfo.querySelector('h1').textContent;
+        const mainTitleElement = document.querySelector('.product-detail h1, .frame-editor h2');
+        const productName = mainTitleElement.textContent;
         const productPrice = productInfo.querySelector('.product-price').textContent;
         const quantityInput = document.getElementById('quantity');
         const productQuantity = quantityInput ? parseInt(quantityInput.value) : 1;
 
         let productImage = '';
-        const previewCanvas = document.getElementById('preview-canvas') || document.getElementById('keychain-preview-canvas');
-
-        if (previewCanvas && document.getElementById('image-upload') && document.getElementById('image-upload').files.length > 0) {
+        const previewCanvas = document.getElementById('preview-canvas');
+        
+        const imageUploadInput = document.getElementById('image-upload');
+        if (previewCanvas && imageUploadInput && imageUploadInput.files.length > 0) {
             productImage = previewCanvas.toDataURL('image/jpeg');
         } else {
             const imgElement = document.querySelector('.product-image img');
             if (imgElement) { productImage = imgElement.src; }
         }
 
-        if ((document.getElementById('image-upload')) && !productImage) {
+        if (imageUploadInput && !productImage) {
             alert('Please upload an image before adding to cart!');
             return;
         }
 
         let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-        const existingProductIndex = cart.findIndex(item => item.name === productName && !item.custom);
+        const isCustom = !!previewCanvas;
+        const existingProductIndex = cart.findIndex(item => item.name === productName && !item.custom && !isCustom);
 
         if (existingProductIndex > -1) {
             cart[existingProductIndex].quantity += productQuantity;
@@ -85,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 price: productPrice,
                 quantity: productQuantity,
                 image: productImage,
-                custom: !!previewCanvas,
+                custom: isCustom,
                 baseprice: productInfo.querySelector('.product') ? productInfo.querySelector('.product').textContent.trim() : null
             };
             cart.push(productToAdd);
@@ -96,118 +87,114 @@ document.addEventListener('DOMContentLoaded', function() {
         updateCartIcon();
       });
     }
+    
+    // --- FRAME EDITOR LOGIC ---
+    if (document.getElementById('frame-style')) { // Check if we are on the frame editor page
+        const frameEditorCanvas = document.getElementById('preview-canvas');
+        const ctx = frameEditorCanvas.getContext('2d');
+        const imageUpload = document.getElementById('image-upload');
+        const frameStyleSelect = document.getElementById('frame-style');
+        const frameWidthInput = document.getElementById('frame-width');
+        const frameHeightInput = document.getElementById('frame-height');
+        let uploadedImage = null;
 
-    const cartItemsContainer = document.getElementById('cart-items-container');
-    function renderCart() {
-        if (!cartItemsContainer) return;
-        const cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-        const emptyCartMessage = document.getElementById('empty-cart-message');
-        const cartSummary = document.getElementById('cart-summary');
-        const cartSubtotalEl = document.getElementById('cart-subtotal');
-        let subtotal = 0;
-
-        cartItemsContainer.innerHTML = '';
-
-        if (cart.length === 0) {
-            emptyCartMessage.style.display = 'block';
-            cartSummary.style.display = 'none';
-        } else {
-            emptyCartMessage.style.display = 'none';
-            cartSummary.style.display = 'flex';
-            cart.forEach((product, index) => {
-                const priceAsNumber = parseFloat(product.price.replace('₹', ''));
-                const itemTotal = priceAsNumber * product.quantity;
-                subtotal += itemTotal;
-                const cartItemHTML = `<div class="cart-item"><div class="cart-item-image"><img src="${product.image}" alt="${product.name}"></div><div class="cart-item-details"><h3>${product.name}</h3>${product.baseprice ? `<p class="base-price-text">${product.baseprice}</p>` : ''}<p>Price: ${product.price}</p></div><div class="cart-item-quantity"><input type="number" value="${product.quantity}" min="1" data-index="${index}"></div><p class="cart-item-price">₹${itemTotal.toFixed(2)}</p><button class="remove-item-btn" data-index="${index}">&times;</button></div>`;
-                cartItemsContainer.innerHTML += cartItemHTML;
-            });
-            cartSubtotalEl.textContent = `₹${subtotal.toFixed(2)}`;
-        }
-    }
-
-    if (cartItemsContainer) {
-        renderCart();
-        cartItemsContainer.addEventListener('click', (event) => {
-            if (event.target.classList.contains('remove-item-btn')) {
-                let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-                cart.splice(event.target.dataset.index, 1);
-                localStorage.setItem('shoppingCart', JSON.stringify(cart));
-                renderCart();
-                updateCartIcon();
+        function drawFrameCanvas() {
+            ctx.clearRect(0, 0, frameEditorCanvas.width, frameEditorCanvas.height);
+            const frameWidth = frameWidthInput.value;
+            const frameHeight = frameHeightInput.value;
+            const canvasAspectRatio = frameEditorCanvas.width / frameEditorCanvas.height;
+            const frameAspectRatio = frameWidth / frameHeight;
+            let drawWidth, drawHeight, offsetX, offsetY;
+            if (frameAspectRatio > canvasAspectRatio) {
+                drawWidth = frameEditorCanvas.width;
+                drawHeight = drawWidth / frameAspectRatio;
+                offsetX = 0;
+                offsetY = (frameEditorCanvas.height - drawHeight) / 2;
+            } else {
+                drawHeight = frameEditorCanvas.height;
+                drawWidth = drawHeight * frameAspectRatio;
+                offsetY = 0;
+                offsetX = (frameEditorCanvas.width - drawWidth) / 2;
             }
-        });
-        cartItemsContainer.addEventListener('change', (event) => {
-            if (event.target.matches('input[type="number"]')) {
-                let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-                const index = event.target.dataset.index;
-                const newQuantity = parseInt(event.target.value);
-                if (newQuantity > 0) {
-                    cart[index].quantity = newQuantity;
-                } else {
-                    cart.splice(index, 1);
-                }
-                localStorage.setItem('shoppingCart', JSON.stringify(cart));
-                renderCart();
-                updateCartIcon();
+            if (uploadedImage) {
+                ctx.drawImage(uploadedImage, offsetX, offsetY, drawWidth, drawHeight);
+            } else {
+                ctx.fillStyle = '#e0e0e0';
+                ctx.fillRect(offsetX, offsetY, drawWidth, drawHeight);
+                ctx.fillStyle = '#a0a0a0';
+                ctx.font = '30px Poppins';
+                ctx.textAlign = 'center';
+                ctx.fillText('Your Image Here', frameEditorCanvas.width / 2, frameEditorCanvas.height / 2);
             }
-        });
-    }
-
-    // --- Checkout Page Logic (UPGRADED FOR FIREBASE V9+) ---
-    const summaryItemsContainer = document.getElementById('summary-items-container');
-    if (summaryItemsContainer) {
-        const cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-        const summaryTotalEl = document.getElementById('summary-total');
-        let subtotal = 0;
-
-        if (cart.length > 0) {
-            cart.forEach(product => {
-                const priceAsNumber = parseFloat(product.price.replace('₹', ''));
-                const itemTotal = priceAsNumber * product.quantity;
-                subtotal += itemTotal;
-                const summaryItemHTML = `<div class="summary-item"><span class="item-name">${product.name} (x${product.quantity})</span><span class="item-price">₹${itemTotal.toFixed(2)}</span></div>`;
-                summaryItemsContainer.innerHTML += summaryItemHTML;
-            });
-            summaryTotalEl.textContent = `₹${subtotal.toFixed(2)}`;
+            ctx.lineWidth = 20;
+            const frameStyle = frameStyleSelect.value;
+            if (frameStyle === 'wood') { ctx.strokeStyle = '#8d5524'; }
+            else if (frameStyle === 'metal') { ctx.strokeStyle = '#adb5bd'; }
+            else if (frameStyle === 'ornate') { ctx.strokeStyle = '#d4af37'; }
+            ctx.strokeRect(offsetX, offsetY, drawWidth, drawHeight);
         }
 
-        const shippingForm = document.getElementById('shipping-form');
-        shippingForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            
-            if (cart.length === 0) {
-                alert("Your cart is empty. Please add items before placing an order.");
-                return;
-            }
-
-            const shippingDetails = {
-                name: document.getElementById('full-name').value,
-                email: document.getElementById('email').value,
-                address: document.getElementById('address').value,
-                phone: document.getElementById('phone').value,
+        imageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImage = new Image();
+                uploadedImage.src = e.target.result;
+                uploadedImage.onload = () => drawFrameCanvas();
             };
-
-            const order = {
-                shipping: shippingDetails,
-                items: cart,
-                total: subtotal,
-                createdAt: new Date()
-            };
-
-            try {
-                // Save the order to a new "orders" collection in Firestore
-                await addDoc(collection(db, "orders"), order);
-                
-                localStorage.removeItem('shoppingCart');
-                alert('Order placed successfully! Thank you for your purchase.');
-                window.location.href = 'thank-you.html';
-
-            } catch (error) {
-                console.error("Error writing document: ", error);
-                alert("There was an error placing your order. Please try again.");
-            }
+            reader.readAsDataURL(file);
         });
+
+        frameStyleSelect.addEventListener('change', drawFrameCanvas);
+        frameWidthInput.addEventListener('input', drawFrameCanvas);
+        frameHeightInput.addEventListener('input', drawFrameCanvas);
+        drawFrameCanvas();
     }
 
+    // --- KEYCHAIN EDITOR LOGIC ---
+    if(document.getElementById('add-keychain-btn')) { // Check if we are on keychain editor page
+        const keychainCanvas = document.getElementById('preview-canvas');
+        const ctx = keychainCanvas.getContext('2d');
+        const imageUpload = document.getElementById('image-upload');
+        let uploadedImage = null;
+
+        function drawKeychainCanvas() {
+            ctx.clearRect(0, 0, keychainCanvas.width, keychainCanvas.height);
+            if (uploadedImage) {
+                const hRatio = keychainCanvas.width / uploadedImage.width;
+                const vRatio = keychainCanvas.height / uploadedImage.height;
+                const ratio = Math.min(hRatio, vRatio) * 0.9;
+                const centeredWidth = uploadedImage.width * ratio;
+                const centeredHeight = uploadedImage.height * ratio;
+                const offsetX = (keychainCanvas.width - centeredWidth) / 2;
+                const offsetY = (keychainCanvas.height - centeredHeight) / 2;
+                ctx.drawImage(uploadedImage, offsetX, offsetY, centeredWidth, centeredHeight);
+            } else {
+                ctx.fillStyle = '#e0e0e0';
+                ctx.fillRect(0, 0, keychainCanvas.width, keychainCanvas.height);
+                ctx.fillStyle = '#a0a0a0';
+                ctx.font = '30px Poppins';
+                ctx.textAlign = 'center';
+                ctx.fillText('Your Design Here', keychainCanvas.width / 2, keychainCanvas.height / 2);
+            }
+        }
+
+        imageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImage = new Image();
+                uploadedImage.src = e.target.result;
+                uploadedImage.onload = () => drawKeychainCanvas();
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        drawKeychainCanvas();
+    }
+
+    // Call initial functions that should run on every page
     updateCartIcon();
 });
