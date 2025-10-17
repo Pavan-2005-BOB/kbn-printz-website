@@ -239,7 +239,7 @@ class ShoppingCart {
     }
     
     getItems() {
-        return [...this.items]; // Return copy to prevent direct mutation
+        return [...this.items];
     }
     
     isEmpty() {
@@ -257,7 +257,7 @@ function handleImageUpload(event, callback) {
     if (!file) return;
 
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
     
     if (!validTypes.includes(file.type)) {
         showEnhancedNotification('Please upload JPEG, PNG, GIF, or WebP images only', 'error');
@@ -270,16 +270,20 @@ function handleImageUpload(event, callback) {
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = function(e) {
         const img = new Image();
         img.src = e.target.result;
-        img.onload = () => {
+        img.onload = function() {
             showEnhancedNotification('Image uploaded successfully!', 'success');
             callback(img);
         };
-        img.onerror = () => showEnhancedNotification('Error loading image', 'error');
+        img.onerror = function() {
+            showEnhancedNotification('Error loading image', 'error');
+        };
     };
-    reader.onerror = () => showEnhancedNotification('Error reading file', 'error');
+    reader.onerror = function() {
+        showEnhancedNotification('Error reading file', 'error');
+    };
     reader.readAsDataURL(file);
 }
 
@@ -291,7 +295,6 @@ function initializeCanvas(canvasId) {
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
     
-    // Set proper dimensions
     canvas.width = rect.width;
     canvas.height = rect.height;
     
@@ -300,7 +303,7 @@ function initializeCanvas(canvasId) {
 
 // --- ADD TO CART LOGIC ---
 function setupAddToCart() {
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', function(e) {
         const addToCartBtn = e.target.closest('.btn-primary, #add-keychain-btn, #add-custom-frame-btn, .add-to-cart-btn');
         if (!addToCartBtn || !cart) return;
         
@@ -325,7 +328,6 @@ function extractProductInfo(productElement) {
         const priceElement = productElement.querySelector('.product-price, .price, .product-cost');
         const quantityInput = document.getElementById('quantity') || productElement.querySelector('.quantity-input');
         
-        // Get product image
         let image = '';
         const imgElement = productElement.querySelector('img');
         if (imgElement) {
@@ -333,8 +335,8 @@ function extractProductInfo(productElement) {
         }
         
         return {
-            name: nameElement?.textContent?.trim() || 'Custom Product',
-            price: priceElement?.textContent?.trim() || '₹0.00',
+            name: nameElement ? nameElement.textContent.trim() : 'Custom Product',
+            price: priceElement ? priceElement.textContent.trim() : '₹0.00',
             quantity: quantityInput ? parseInt(quantityInput.value) || 1 : 1,
             image: image,
             custom: !!document.getElementById('preview-canvas'),
@@ -353,16 +355,15 @@ function initializeFrameEditor() {
     const canvasInfo = initializeCanvas('preview-canvas');
     if (!canvasInfo) return;
     
-    const { canvas, ctx } = canvasInfo;
+    const canvas = canvasInfo.canvas;
+    const ctx = canvasInfo.ctx;
     const imageUpload = document.getElementById('image-upload');
     let uploadedImage = null;
 
     function drawFrame() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Draw placeholder or image
         if (uploadedImage) {
-            // Draw image with aspect ratio preservation
             const scale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
             const width = uploadedImage.width * scale;
             const height = uploadedImage.height * scale;
@@ -379,18 +380,19 @@ function initializeFrameEditor() {
             ctx.fillText('Upload your image to preview', canvas.width / 2, canvas.height / 2);
         }
         
-        // Draw frame border
         ctx.strokeStyle = '#8d5524';
         ctx.lineWidth = 10;
         ctx.strokeRect(0, 0, canvas.width, canvas.height);
     }
 
-    imageUpload?.addEventListener('change', (event) => {
-        handleImageUpload(event, (img) => {
-            uploadedImage = img;
-            drawFrame();
+    if (imageUpload) {
+        imageUpload.addEventListener('change', function(event) {
+            handleImageUpload(event, function(img) {
+                uploadedImage = img;
+                drawFrame();
+            });
         });
-    });
+    }
 
     drawFrame();
 }
@@ -402,7 +404,8 @@ function initializeKeychainEditor() {
     const canvasInfo = initializeCanvas('preview-canvas');
     if (!canvasInfo) return;
     
-    const { canvas, ctx } = canvasInfo;
+    const canvas = canvasInfo.canvas;
+    const ctx = canvasInfo.ctx;
     const imageUpload = document.getElementById('image-upload');
     let uploadedImage = null;
 
@@ -410,18 +413,15 @@ function initializeKeychainEditor() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         if (uploadedImage) {
-            // Draw circular keychain design
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             const radius = Math.min(canvas.width, canvas.height) * 0.4;
             
-            // Create circular clipping path
             ctx.save();
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
             ctx.clip();
             
-            // Draw image within circle
             const scale = Math.min(radius * 2 / uploadedImage.width, radius * 2 / uploadedImage.height);
             const width = uploadedImage.width * scale;
             const height = uploadedImage.height * scale;
@@ -431,7 +431,6 @@ function initializeKeychainEditor() {
             ctx.drawImage(uploadedImage, x, y, width, height);
             ctx.restore();
             
-            // Draw keychain ring
             ctx.strokeStyle = '#ffd700';
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -447,12 +446,14 @@ function initializeKeychainEditor() {
         }
     }
 
-    imageUpload?.addEventListener('change', (event) => {
-        handleImageUpload(event, (img) => {
-            uploadedImage = img;
-            drawKeychain();
+    if (imageUpload) {
+        imageUpload.addEventListener('change', function(event) {
+            handleImageUpload(event, function(img) {
+                uploadedImage = img;
+                drawKeychain();
+            });
         });
-    });
+    }
 
     drawKeychain();
 }
@@ -469,7 +470,6 @@ function initializeCartPage() {
         const checkoutBtn = document.getElementById('proceed-to-checkout');
         const continueShoppingBtn = document.getElementById('continue-shopping');
         
-        // Load cart data directly from storage for reliability
         const cartItems = JSON.parse(localStorage.getItem('shoppingCart')) || [];
         
         if (!cartItems || cartItems.length === 0) {
@@ -485,7 +485,8 @@ function initializeCartPage() {
         if (checkoutBtn) checkoutBtn.style.display = 'block';
         
         if (container) {
-            container.innerHTML = cartItems.map((item, index) => `
+            container.innerHTML = cartItems.map(function(item, index) {
+                return `
                 <div class="cart-item" data-item-id="${item.id}">
                     <div class="cart-item-image">
                         <img src="${item.image || 'https://placehold.co/100x100/f8f9fa/6c757d?text=No+Image'}" 
@@ -510,18 +511,18 @@ function initializeCartPage() {
                         ×
                     </button>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
         
         if (subtotal) {
-            const total = cartItems.reduce((sum, item) => {
+            const total = cartItems.reduce(function(sum, item) {
                 const price = parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
                 return sum + (price * item.quantity);
             }, 0);
-            subtotal.textContent = `₹${total.toFixed(2)}`;
+            subtotal.textContent = '₹' + total.toFixed(2);
         }
         
-        // Update checkout button
         if (checkoutBtn) {
             checkoutBtn.onclick = function(e) {
                 e.preventDefault();
@@ -533,7 +534,6 @@ function initializeCartPage() {
             };
         }
         
-        // Continue shopping button
         if (continueShoppingBtn) {
             continueShoppingBtn.onclick = function(e) {
                 e.preventDefault();
@@ -542,10 +542,8 @@ function initializeCartPage() {
         }
     }
     
-    // Render initial cart
     renderCart();
     
-    // Update when cart changes
     window.addEventListener('cartUpdated', renderCart);
     window.addEventListener('storage', renderCart);
 }
@@ -563,7 +561,6 @@ function initializeCheckoutPage() {
         const taxElement = document.getElementById('checkout-tax');
         const shippingElement = document.getElementById('checkout-shipping');
         
-        // Load cart data directly from localStorage
         const cartItems = JSON.parse(localStorage.getItem('shoppingCart')) || [];
         
         if (!cartItems || cartItems.length === 0) {
@@ -580,35 +577,35 @@ function initializeCheckoutPage() {
         if (emptyCheckout) emptyCheckout.style.display = 'none';
         if (checkoutForm) checkoutForm.style.display = 'block';
         
-        // Calculate totals
-        const subtotal = cartItems.reduce((sum, item) => {
+        const subtotal = cartItems.reduce(function(sum, item) {
             const price = parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
             return sum + (price * item.quantity);
         }, 0);
         
-        const tax = subtotal * 0.18; // 18% GST
-        const shipping = subtotal > 500 ? 0 : 50; // Free shipping above ₹500
+        const tax = subtotal * 0.18;
+        const shipping = subtotal > 500 ? 0 : 50;
         const total = subtotal + tax + shipping;
         
         if (container) {
-            container.innerHTML = cartItems.map(item => `
+            container.innerHTML = cartItems.map(function(item) {
+                return `
                 <div class="summary-item">
                     <span class="item-name">${item.name} ${item.custom ? '(Custom)' : ''} × ${item.quantity}</span>
                     <span class="item-price">${item.price}</span>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
         
-        if (subtotalElement) subtotalElement.textContent = `₹${subtotal.toFixed(2)}`;
-        if (taxElement) taxElement.textContent = `₹${tax.toFixed(2)}`;
-        if (shippingElement) shippingElement.textContent = shipping === 0 ? 'FREE' : `₹${shipping.toFixed(2)}`;
-        if (totalElement) totalElement.textContent = `₹${total.toFixed(2)}`;
+        if (subtotalElement) subtotalElement.textContent = '₹' + subtotal.toFixed(2);
+        if (taxElement) taxElement.textContent = '₹' + tax.toFixed(2);
+        if (shippingElement) shippingElement.textContent = shipping === 0 ? 'FREE' : '₹' + shipping.toFixed(2);
+        if (totalElement) totalElement.textContent = '₹' + total.toFixed(2);
     }
     
-    // Handle form submission
     const form = document.getElementById('shipping-form');
     if (form) {
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const cartItems = JSON.parse(localStorage.getItem('shoppingCart')) || [];
@@ -617,27 +614,25 @@ function initializeCheckoutPage() {
                 return;
             }
             
-            // Validate form
             const formData = new FormData(form);
             const customerInfo = Object.fromEntries(formData);
             
-            // Basic validation
             const requiredFields = ['name', 'email', 'phone', 'address', 'city', 'pincode'];
-            const missingFields = requiredFields.filter(field => !customerInfo[field]?.trim());
+            const missingFields = requiredFields.filter(function(field) {
+                return !customerInfo[field] || !customerInfo[field].trim();
+            });
             
             if (missingFields.length > 0) {
                 showEnhancedNotification('Please fill all required fields', 'error');
                 return;
             }
             
-            // Email validation
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(customerInfo.email)) {
                 showEnhancedNotification('Please enter a valid email address', 'error');
                 return;
             }
             
-            // Phone validation
             const phoneRegex = /^[0-9]{10}$/;
             const cleanPhone = customerInfo.phone.replace(/\D/g, '');
             if (!phoneRegex.test(cleanPhone)) {
@@ -645,22 +640,19 @@ function initializeCheckoutPage() {
                 return;
             }
             
-            // Pincode validation
             const pincodeRegex = /^[0-9]{6}$/;
             if (!pincodeRegex.test(customerInfo.pincode)) {
                 showEnhancedNotification('Please enter a valid 6-digit pincode', 'error');
                 return;
             }
             
-            // Show loading state
             const submitBtn = form.querySelector('button[type="submit"]');
             const originalText = submitBtn.textContent;
             submitBtn.textContent = 'Processing...';
             submitBtn.disabled = true;
             
             try {
-                // Calculate final totals
-                const subtotal = cartItems.reduce((sum, item) => {
+                const subtotal = cartItems.reduce(function(sum, item) {
                     const price = parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
                     return sum + (price * item.quantity);
                 }, 0);
@@ -668,59 +660,49 @@ function initializeCheckoutPage() {
                 const shipping = subtotal > 500 ? 0 : 50;
                 const total = subtotal + tax + shipping;
                 
-                // Create order data
                 const orderData = {
                     customerInfo: customerInfo,
                     items: cartItems,
-                    subtotal: `₹${subtotal.toFixed(2)}`,
-                    tax: `₹${tax.toFixed(2)}`,
-                    shipping: shipping === 0 ? 'FREE' : `₹${shipping.toFixed(2)}`,
-                    total: `₹${total.toFixed(2)}`,
+                    subtotal: '₹' + subtotal.toFixed(2),
+                    tax: '₹' + tax.toFixed(2),
+                    shipping: shipping === 0 ? 'FREE' : '₹' + shipping.toFixed(2),
+                    total: '₹' + total.toFixed(2),
                     orderDate: new Date().toISOString(),
                     orderId: 'KBN' + Date.now(),
                     status: 'confirmed'
                 };
                 
-                // Save order to localStorage
                 localStorage.setItem('kbnOrders', JSON.stringify(orderData));
                 
-                // Try to save to Firebase if available
                 if (db) {
                     try {
                         const firestore = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js');
                         await firestore.setDoc(firestore.doc(db, "orders", orderData.orderId), orderData);
                         console.log("Order saved to Firebase");
                     } catch (firebaseError) {
-                        console.warn("Failed to save to Firebase, using localStorage only:", firebaseError);
+                        console.warn("Failed to save to Firebase:", firebaseError);
                     }
                 }
                 
-                // Clear cart
                 localStorage.removeItem('shoppingCart');
                 if (cart) cart.clear();
                 
                 showEnhancedNotification('Order placed successfully! Redirecting...', 'success');
                 
-                // Redirect to confirmation page
-                setTimeout(() => {
-                    window.location.href = `order-confirmation.html?orderId=${orderData.orderId}`;
+                setTimeout(function() {
+                    window.location.href = 'order-confirmation.html?orderId=' + orderData.orderId;
                 }, 2000);
                 
             } catch (error) {
                 console.error('Order processing error:', error);
                 showEnhancedNotification('Error processing order. Please try again.', 'error');
-                
-                // Reset button state
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
             }
         });
     }
     
-    // Render initial summary
     renderOrderSummary();
-    
-    // Also check if user came here with empty cart
     window.addEventListener('load', renderOrderSummary);
 }
 
@@ -732,37 +714,48 @@ function initializeOrderConfirmation() {
     const orderId = urlParams.get('orderId');
     
     if (orderId) {
-        // Try to get order from localStorage
         const orderData = JSON.parse(localStorage.getItem('kbnOrders'));
         
         if (orderData && orderData.orderId === orderId) {
-            document.getElementById('order-id')?.textContent = orderData.orderId;
-            document.getElementById('order-total')?.textContent = orderData.total;
-            document.getElementById('customer-name')?.textContent = orderData.customerInfo.name;
-            document.getElementById('customer-email')?.textContent = orderData.customerInfo.email;
-            document.getElementById('customer-phone')?.textContent = orderData.customerInfo.phone;
-            document.getElementById('customer-address')?.textContent = 
-                `${orderData.customerInfo.address}, ${orderData.customerInfo.city} - ${orderData.customerInfo.pincode}`;
-            
-            // Render order items
+            const orderIdElement = document.getElementById('order-id');
+            const orderTotalElement = document.getElementById('order-total');
+            const customerNameElement = document.getElementById('customer-name');
+            const customerEmailElement = document.getElementById('customer-email');
+            const customerPhoneElement = document.getElementById('customer-phone');
+            const customerAddressElement = document.getElementById('customer-address');
             const itemsContainer = document.getElementById('order-items');
+            
+            if (orderIdElement) orderIdElement.textContent = orderData.orderId;
+            if (orderTotalElement) orderTotalElement.textContent = orderData.total;
+            if (customerNameElement) customerNameElement.textContent = orderData.customerInfo.name;
+            if (customerEmailElement) customerEmailElement.textContent = orderData.customerInfo.email;
+            if (customerPhoneElement) customerPhoneElement.textContent = orderData.customerInfo.phone;
+            if (customerAddressElement) {
+                customerAddressElement.textContent = 
+                    orderData.customerInfo.address + ', ' + 
+                    orderData.customerInfo.city + ' - ' + 
+                    orderData.customerInfo.pincode;
+            }
+            
             if (itemsContainer && orderData.items) {
-                itemsContainer.innerHTML = orderData.items.map(item => `
+                itemsContainer.innerHTML = orderData.items.map(function(item) {
+                    return `
                     <div class="order-item">
                         <span>${item.name} ${item.custom ? '(Custom)' : ''} × ${item.quantity}</span>
                         <span>${item.price}</span>
                     </div>
-                `).join('');
+                    `;
+                }).join('');
             }
         } else {
             showEnhancedNotification('Order not found', 'error');
-            setTimeout(() => {
+            setTimeout(function() {
                 window.location.href = 'index.html';
             }, 3000);
         }
     } else {
         showEnhancedNotification('Invalid order reference', 'error');
-        setTimeout(() => {
+        setTimeout(function() {
             window.location.href = 'index.html';
         }, 3000);
     }
@@ -774,23 +767,21 @@ function initializeMobileNavigation() {
     const mainNav = document.querySelector('.main-nav');
     
     if (navToggle && mainNav) {
-        navToggle.addEventListener('click', () => {
+        navToggle.addEventListener('click', function() {
             mainNav.classList.toggle('is-open');
             navToggle.classList.toggle('is-open');
             document.body.style.overflow = mainNav.classList.contains('is-open') ? 'hidden' : '';
         });
         
-        // Close mobile nav when clicking on links
-        mainNav.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', () => {
+        mainNav.querySelectorAll('a').forEach(function(link) {
+            link.addEventListener('click', function() {
                 mainNav.classList.remove('is-open');
                 navToggle.classList.remove('is-open');
                 document.body.style.overflow = '';
             });
         });
         
-        // Close mobile nav when clicking outside
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', function(e) {
             if (mainNav.classList.contains('is-open') && 
                 !mainNav.contains(e.target) && 
                 !navToggle.contains(e.target)) {
@@ -802,13 +793,11 @@ function initializeMobileNavigation() {
     }
 }
 
-// --- NETLIFY SPECIFIC FIXES ---
+// --- NETLIFY COMPATIBILITY ---
 function initializeNetlifyCompatibility() {
-    // Handle Netlify form submissions if any
     const netlifyForms = document.querySelectorAll('form[data-netlify="true"]');
-    netlifyForms.forEach(form => {
-        form.addEventListener('submit', async (e) => {
-            // Let Netlify handle its own forms
+    netlifyForms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
             console.log('Netlify form submission detected');
         });
     });
@@ -819,7 +808,6 @@ async function initializeKBNPrintz() {
     try {
         console.log('🚀 Initializing KBN Printz Store...');
         
-        // Initialize Firebase (optional - works offline too)
         try {
             const firebase = await loadFirebase();
             app = firebase.app;
@@ -829,10 +817,8 @@ async function initializeKBNPrintz() {
             console.log('Firebase not available, running in offline mode');
         }
         
-        // Initialize shopping cart
         cart = new ShoppingCart();
         
-        // Initialize AOS animations
         if (typeof AOS !== 'undefined') {
             AOS.init({ 
                 once: true, 
@@ -841,13 +827,8 @@ async function initializeKBNPrintz() {
             });
         }
         
-        // Initialize mobile navigation
         initializeMobileNavigation();
-        
-        // Initialize Netlify compatibility
         initializeNetlifyCompatibility();
-        
-        // Initialize page-specific functionality
         setupAddToCart();
         initializeFrameEditor();
         initializeKeychainEditor();
@@ -872,33 +853,30 @@ if (document.readyState === 'loading') {
 
 // --- GLOBAL ACCESS ---
 window.KBNPrintz = {
-    cart: () => cart,
+    cart: function() { return cart; },
     showNotification: showEnhancedNotification,
-    firebase: () => ({ app, analytics, db })
+    firebase: function() { return { app: app, analytics: analytics, db: db }; }
 };
 
-// --- ERROR BOUNDARY ---
-window.addEventListener('error', (event) => {
+// --- ERROR HANDLING ---
+window.addEventListener('error', function(event) {
     console.error('Global error:', event.error);
 });
 
-window.addEventListener('unhandledrejection', (event) => {
+window.addEventListener('unhandledrejection', function(event) {
     console.error('Unhandled promise rejection:', event.reason);
 });
 
-// --- OFFLINE SUPPORT ---
-window.addEventListener('online', () => {
+window.addEventListener('online', function() {
     showEnhancedNotification('Connection restored', 'success');
 });
 
-window.addEventListener('offline', () => {
+window.addEventListener('offline', function() {
     showEnhancedNotification('You are currently offline', 'warning');
 });
 
-// --- PAGE VISIBILITY ---
-document.addEventListener('visibilitychange', () => {
+document.addEventListener('visibilitychange', function() {
     if (!document.hidden && cart) {
-        // Refresh cart when page becomes visible
         cart.updateUI();
     }
 });
