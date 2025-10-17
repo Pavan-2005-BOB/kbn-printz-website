@@ -1,8 +1,58 @@
-// --- GLOBAL VARIABLES ---
-let cart = null;
-let db = null;
+// --- FIREBASE CONFIGURATION ---
+const firebaseConfig = {
+    apiKey: "AIzaSyC4dTEmXIiGDeIpPmug7D8z1DU2-ZE6kso",
+    authDomain: "kbn-printz-store.firebaseapp.com",
+    projectId: "kbn-printz-store",
+    storageBucket: "kbn-printz-store.firebasestorage.app",
+    messagingSenderId: "1067786431485",
+    appId: "1:1067786431485:web:83e1db7c5880d952574794",
+    measurementId: "G-4SST0WTRMZ"
+};
+
+// --- SAFE FIREBASE IMPORT WITH ERROR HANDLING ---
+let firebaseInitialized = false;
 let app = null;
 let analytics = null;
+let db = null;
+
+async function loadFirebase() {
+    try {
+        // Check if Firebase is already loaded
+        if (window.firebaseApp) {
+            console.log("Firebase already loaded, reusing existing instance");
+            return { 
+                app: window.firebaseApp, 
+                analytics: window.firebaseAnalytics, 
+                db: window.firebaseDb 
+            };
+        }
+
+        // Dynamically import Firebase v12.4.0
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js');
+        const { getAnalytics } = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js');
+        const { getFirestore } = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js');
+        
+        app = initializeApp(firebaseConfig);
+        analytics = getAnalytics(app);
+        db = getFirestore(app);
+        
+        // Store globally to prevent re-initialization
+        window.firebaseApp = app;
+        window.firebaseAnalytics = analytics;
+        window.firebaseDb = db;
+        firebaseInitialized = true;
+        
+        console.log("Firebase v12.4.0 initialized successfully ✅");
+        return { app, analytics, db };
+    } catch (error) {
+        console.error("Firebase initialization failed:", error);
+        // Continue without Firebase - offline mode
+        return { app: null, analytics: null, db: null };
+    }
+}
+
+// --- GLOBAL VARIABLES ---
+let cart = null;
 
 // --- ENHANCED NOTIFICATION SYSTEM ---
 function showEnhancedNotification(message, type = 'success', duration = 4000) {
@@ -52,6 +102,7 @@ function showEnhancedNotification(message, type = 'success', duration = 4000) {
                 gap: 10px;
                 animation: slideInRight 0.3s ease;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                font-family: 'Poppins', sans-serif;
             }
             .toast-success { background: #10b981; }
             .toast-error { background: #ef4444; }
@@ -65,8 +116,13 @@ function showEnhancedNotification(message, type = 'success', duration = 4000) {
                 opacity: 0.7;
                 margin-left: auto;
                 padding: 4px;
+                border-radius: 4px;
+                transition: opacity 0.2s;
             }
-            .toast-close:hover { opacity: 1; }
+            .toast-close:hover {
+                opacity: 1;
+                background: rgba(255,255,255,0.1);
+            }
             @keyframes slideInRight {
                 from { transform: translateX(100%); opacity: 0; }
                 to { transform: translateX(0); opacity: 1; }
@@ -79,18 +135,28 @@ function showEnhancedNotification(message, type = 'success', duration = 4000) {
     
     setTimeout(() => {
         if (toast.parentElement) {
-            toast.remove();
+            toast.style.animation = 'slideInRight 0.3s ease reverse';
+            setTimeout(() => toast.remove(), 300);
         }
     }, duration);
     
     return toast;
 }
 
-// --- SHOPPING CART CLASS ---
+// --- SHOPPING CART CLASS (ENHANCED) ---
 class ShoppingCart {
     constructor() {
-        this.items = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+        this.items = this.loadFromStorage();
         this.updateUI();
+    }
+    
+    loadFromStorage() {
+        try {
+            return JSON.parse(localStorage.getItem('shoppingCart')) || [];
+        } catch (error) {
+            console.error('Error loading cart from storage:', error);
+            return [];
+        }
     }
     
     addItem(product) {
@@ -106,33 +172,34 @@ class ShoppingCart {
         
         if (existingIndex > -1) {
             this.items[existingIndex].quantity += product.quantity;
-            showEnhancedNotification(`Updated quantity of ${product.name}`, 'success');
         } else {
             product.id = Date.now().toString();
             this.items.push(product);
-            showEnhancedNotification(`${product.quantity} x ${product.name} added to cart!`, 'success');
         }
         
         this.save();
+        showEnhancedNotification(`${product.quantity} x ${product.name} added to cart!`, 'success');
         return true;
     }
     
     removeItem(index) {
-        if (index >= 0 && index < this.items.length) {
-            const removedItem = this.items[index];
-            this.items.splice(index, 1);
-            this.save();
-            showEnhancedNotification(`${removedItem.name} removed from cart`, 'warning');
-        }
+        if (index < 0 || index >= this.items.length) return;
+        
+        const itemName = this.items[index].name;
+        this.items.splice(index, 1);
+        this.save();
+        showEnhancedNotification(`${itemName} removed from cart`, 'warning');
     }
     
     updateQuantity(index, newQuantity) {
-        if (index >= 0 && index < this.items.length && newQuantity > 0) {
-            this.items[index].quantity = newQuantity;
-            this.save();
-        } else if (newQuantity < 1) {
+        if (index < 0 || index >= this.items.length) return;
+        
+        if (newQuantity < 1) {
             this.removeItem(index);
+            return;
         }
+        this.items[index].quantity = newQuantity;
+        this.save();
     }
     
     clear() {
@@ -142,9 +209,16 @@ class ShoppingCart {
     }
     
     save() {
-        localStorage.setItem('shoppingCart', JSON.stringify(this.items));
-        this.updateUI();
-        window.dispatchEvent(new CustomEvent('cartUpdated'));
+        try {
+            localStorage.setItem('shoppingCart', JSON.stringify(this.items));
+            this.updateUI();
+            
+            // Trigger custom event for other pages
+            window.dispatchEvent(new CustomEvent('cartUpdated'));
+        } catch (error) {
+            console.error('Error saving cart to storage:', error);
+            showEnhancedNotification('Error saving cart data', 'error');
+        }
     }
     
     updateUI() {
@@ -165,53 +239,15 @@ class ShoppingCart {
     }
     
     getItems() {
-        return this.items;
+        return [...this.items]; // Return copy to prevent direct mutation
     }
-}
-
-// --- FIREBASE CONFIGURATION ---
-const firebaseConfig = {
-    apiKey: "AIzaSyC4dTEmXIiGDeIpPmug7D8z1DU2-ZE6kso",
-    authDomain: "kbn-printz-store.firebaseapp.com",
-    projectId: "kbn-printz-store",
-    storageBucket: "kbn-printz-store.firebasestorage.app",
-    messagingSenderId: "1067786431485",
-    appId: "1:1067786431485:web:83e1db7c5880d952574794",
-    measurementId: "G-4SST0WTRMZ"
-};
-
-// --- FIREBASE LOADER ---
-async function loadFirebase() {
-    try {
-        // Check if Firebase is already available
-        if (window.firebaseApp) {
-            console.log("Firebase already loaded");
-            return { 
-                app: window.firebaseApp, 
-                db: window.firebaseDb,
-                analytics: window.firebaseAnalytics
-            };
-        }
-
-        // Dynamically import Firebase
-        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js');
-        const { getFirestore } = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js');
-        const { getAnalytics } = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-analytics.js');
-        
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const analytics = getAnalytics(app);
-        
-        // Store globally
-        window.firebaseApp = app;
-        window.firebaseDb = db;
-        window.firebaseAnalytics = analytics;
-        
-        console.log("Firebase + Analytics initialized successfully ✅");
-        return { app, db, analytics };
-    } catch (error) {
-        console.log("Firebase not available, running in offline mode");
-        return { app: null, db: null, analytics: null };
+    
+    isEmpty() {
+        return this.items.length === 0;
+    }
+    
+    getItemCount() {
+        return this.items.reduce((sum, item) => sum + item.quantity, 0);
     }
 }
 
@@ -220,15 +256,16 @@ function handleImageUpload(event, callback) {
     const file = event.target.files[0];
     if (!file) return;
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    
     if (!validTypes.includes(file.type)) {
-        showEnhancedNotification('Please upload JPEG, PNG, or GIF images', 'error');
+        showEnhancedNotification('Please upload JPEG, PNG, GIF, or WebP images only', 'error');
         return;
     }
-
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    
     if (file.size > maxSize) {
-        showEnhancedNotification('Image must be smaller than 5MB', 'error');
+        showEnhancedNotification('Image size should be less than 5MB', 'error');
         return;
     }
 
@@ -236,7 +273,10 @@ function handleImageUpload(event, callback) {
     reader.onload = (e) => {
         const img = new Image();
         img.src = e.target.result;
-        img.onload = () => callback(img);
+        img.onload = () => {
+            showEnhancedNotification('Image uploaded successfully!', 'success');
+            callback(img);
+        };
         img.onerror = () => showEnhancedNotification('Error loading image', 'error');
     };
     reader.onerror = () => showEnhancedNotification('Error reading file', 'error');
@@ -246,10 +286,7 @@ function handleImageUpload(event, callback) {
 // --- CANVAS UTILITIES ---
 function initializeCanvas(canvasId) {
     const canvas = document.getElementById(canvasId);
-    if (!canvas) {
-        console.error(`Canvas with id ${canvasId} not found`);
-        return null;
-    }
+    if (!canvas) return null;
     
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
@@ -264,18 +301,12 @@ function initializeCanvas(canvasId) {
 // --- ADD TO CART LOGIC ---
 function setupAddToCart() {
     document.addEventListener('click', (e) => {
-        const addToCartBtn = e.target.closest('.btn-primary, #add-keychain-btn, #add-custom-frame-btn');
-        if (!addToCartBtn) return;
+        const addToCartBtn = e.target.closest('.btn-primary, #add-keychain-btn, #add-custom-frame-btn, .add-to-cart-btn');
+        if (!addToCartBtn || !cart) return;
         
         e.preventDefault();
         
-        // Check if cart is ready
-        if (!window.KBNPrintz || !window.KBNPrintz.cart()) {
-            showEnhancedNotification('Please wait, cart is loading...', 'warning');
-            return;
-        }
-        
-        const productElement = addToCartBtn.closest('.product-info, .editor-controls, .product-card');
+        const productElement = addToCartBtn.closest('.product-info, .editor-controls, .product-card, .product-details');
         if (!productElement) {
             showEnhancedNotification('Product not found', 'error');
             return;
@@ -283,43 +314,31 @@ function setupAddToCart() {
         
         const productInfo = extractProductInfo(productElement);
         if (productInfo) {
-            window.KBNPrintz.cart().addItem(productInfo);
+            cart.addItem(productInfo);
         }
     });
 }
 
 function extractProductInfo(productElement) {
     try {
-        const nameElement = productElement.querySelector('h1, h2, h3');
-        const priceElement = productElement.querySelector('.product-price, .price');
-        const quantityInput = document.getElementById('quantity') || productElement.querySelector('input[type="number"]');
+        const nameElement = productElement.querySelector('h1, h2, h3, .product-name');
+        const priceElement = productElement.querySelector('.product-price, .price, .product-cost');
+        const quantityInput = document.getElementById('quantity') || productElement.querySelector('.quantity-input');
         
-        const productName = nameElement?.textContent?.trim() || 'Custom Product';
-        const productPrice = priceElement?.textContent?.trim() || '₹0.00';
-        const productQuantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
-        
-        // Check for custom product with image
-        const previewCanvas = document.getElementById('preview-canvas');
-        const imageUpload = document.getElementById('image-upload');
-        let productImage = '';
-        
-        if (previewCanvas && imageUpload && imageUpload.files.length > 0) {
-            productImage = previewCanvas.toDataURL('image/jpeg', 0.8);
-        } else {
-            const imgElement = productElement.querySelector('.product-image img, img');
-            if (imgElement) { 
-                productImage = imgElement.src; 
-            }
+        // Get product image
+        let image = '';
+        const imgElement = productElement.querySelector('img');
+        if (imgElement) {
+            image = imgElement.src;
         }
         
         return {
-            name: productName,
-            price: productPrice,
-            quantity: productQuantity,
-            image: productImage,
-            custom: !!previewCanvas,
-            requiresImage: !!imageUpload,
-            id: Date.now().toString()
+            name: nameElement?.textContent?.trim() || 'Custom Product',
+            price: priceElement?.textContent?.trim() || '₹0.00',
+            quantity: quantityInput ? parseInt(quantityInput.value) || 1 : 1,
+            image: image,
+            custom: !!document.getElementById('preview-canvas'),
+            timestamp: new Date().toISOString()
         };
     } catch (error) {
         console.error('Error extracting product info:', error);
@@ -341,13 +360,21 @@ function initializeFrameEditor() {
     function drawFrame() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
+        // Draw placeholder or image
         if (uploadedImage) {
-            ctx.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
+            // Draw image with aspect ratio preservation
+            const scale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
+            const width = uploadedImage.width * scale;
+            const height = uploadedImage.height * scale;
+            const x = (canvas.width - width) / 2;
+            const y = (canvas.height - height) / 2;
+            
+            ctx.drawImage(uploadedImage, x, y, width, height);
         } else {
             ctx.fillStyle = '#f8f9fa';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#6c757d';
-            ctx.font = '16px Poppins';
+            ctx.font = '16px Poppins, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText('Upload your image to preview', canvas.width / 2, canvas.height / 2);
         }
@@ -383,18 +410,38 @@ function initializeKeychainEditor() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         if (uploadedImage) {
-            const ratio = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height) * 0.8;
-            const width = uploadedImage.width * ratio;
-            const height = uploadedImage.height * ratio;
-            const x = (canvas.width - width) / 2;
-            const y = (canvas.height - height) / 2;
+            // Draw circular keychain design
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(canvas.width, canvas.height) * 0.4;
+            
+            // Create circular clipping path
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.clip();
+            
+            // Draw image within circle
+            const scale = Math.min(radius * 2 / uploadedImage.width, radius * 2 / uploadedImage.height);
+            const width = uploadedImage.width * scale;
+            const height = uploadedImage.height * scale;
+            const x = centerX - width / 2;
+            const y = centerY - height / 2;
             
             ctx.drawImage(uploadedImage, x, y, width, height);
+            ctx.restore();
+            
+            // Draw keychain ring
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY - radius - 15, 10, 0, Math.PI * 2);
+            ctx.stroke();
         } else {
             ctx.fillStyle = '#f8f9fa';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#6c757d';
-            ctx.font = '16px Poppins';
+            ctx.font = '16px Poppins, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText('Upload your design to preview', canvas.width / 2, canvas.height / 2);
         }
@@ -412,49 +459,86 @@ function initializeKeychainEditor() {
 
 // --- CART PAGE FUNCTIONALITY ---
 function initializeCartPage() {
-    const container = document.getElementById('cart-items-container');
-    if (!container) return;
+    if (!document.getElementById('cart-items-container')) return;
     
     function renderCart() {
-        const cart = window.KBNPrintz?.cart();
+        const container = document.getElementById('cart-items-container');
         const emptyMessage = document.getElementById('empty-cart-message');
         const summary = document.getElementById('cart-summary');
         const subtotal = document.getElementById('cart-subtotal');
+        const checkoutBtn = document.getElementById('proceed-to-checkout');
+        const continueShoppingBtn = document.getElementById('continue-shopping');
         
-        if (!cart || cart.getItems().length === 0) {
-            container.innerHTML = '';
+        // Load cart data directly from storage for reliability
+        const cartItems = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+        
+        if (!cartItems || cartItems.length === 0) {
+            if (container) container.innerHTML = '';
             if (emptyMessage) emptyMessage.style.display = 'block';
             if (summary) summary.style.display = 'none';
+            if (checkoutBtn) checkoutBtn.style.display = 'none';
             return;
         }
         
         if (emptyMessage) emptyMessage.style.display = 'none';
         if (summary) summary.style.display = 'block';
+        if (checkoutBtn) checkoutBtn.style.display = 'block';
         
-        container.innerHTML = cart.getItems().map((item, index) => `
-            <div class="cart-item">
-                <div class="cart-item-image">
-                    <img src="${item.image || 'https://placehold.co/100x100/f8f9fa/6c757d?text=No+Image'}" alt="${item.name}" loading="lazy">
+        if (container) {
+            container.innerHTML = cartItems.map((item, index) => `
+                <div class="cart-item" data-item-id="${item.id}">
+                    <div class="cart-item-image">
+                        <img src="${item.image || 'https://placehold.co/100x100/f8f9fa/6c757d?text=No+Image'}" 
+                             alt="${item.name}" 
+                             onerror="this.src='https://placehold.co/100x100/f8f9fa/6c757d?text=No+Image'">
+                    </div>
+                    <div class="cart-item-details">
+                        <h3>${item.name}</h3>
+                        ${item.custom ? '<p class="base-price-text">Custom Design</p>' : ''}
+                        <p class="item-price">${item.price}</p>
+                    </div>
+                    <div class="cart-item-quantity">
+                        <button class="quantity-btn" onclick="cart.updateQuantity(${index}, ${item.quantity - 1})">-</button>
+                        <input type="number" value="${item.quantity}" min="1" 
+                               onchange="cart.updateQuantity(${index}, parseInt(this.value))">
+                        <button class="quantity-btn" onclick="cart.updateQuantity(${index}, ${item.quantity + 1})">+</button>
+                    </div>
+                    <div class="cart-item-price">
+                        ${item.price}
+                    </div>
+                    <button class="remove-item-btn" onclick="cart.removeItem(${index})" title="Remove item">
+                        ×
+                    </button>
                 </div>
-                <div class="cart-item-details">
-                    <h3>${item.name}</h3>
-                    ${item.custom ? '<p class="base-price-text">Custom Design</p>' : ''}
-                </div>
-                <div class="cart-item-quantity">
-                    <input type="number" value="${item.quantity}" min="1" 
-                           onchange="window.KBNPrintz.cart().updateQuantity(${index}, parseInt(this.value))">
-                </div>
-                <div class="cart-item-price">
-                    ${item.price}
-                </div>
-                <button class="remove-item-btn" onclick="window.KBNPrintz.cart().removeItem(${index})">
-                    ×
-                </button>
-            </div>
-        `).join('');
+            `).join('');
+        }
         
         if (subtotal) {
-            subtotal.textContent = `₹${cart.getTotal().toFixed(2)}`;
+            const total = cartItems.reduce((sum, item) => {
+                const price = parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
+                return sum + (price * item.quantity);
+            }, 0);
+            subtotal.textContent = `₹${total.toFixed(2)}`;
+        }
+        
+        // Update checkout button
+        if (checkoutBtn) {
+            checkoutBtn.onclick = function(e) {
+                e.preventDefault();
+                if (cartItems.length > 0) {
+                    window.location.href = 'checkout.html';
+                } else {
+                    showEnhancedNotification('Your cart is empty', 'error');
+                }
+            };
+        }
+        
+        // Continue shopping button
+        if (continueShoppingBtn) {
+            continueShoppingBtn.onclick = function(e) {
+                e.preventDefault();
+                window.location.href = 'products.html';
+            };
         }
     }
     
@@ -463,103 +547,62 @@ function initializeCartPage() {
     
     // Update when cart changes
     window.addEventListener('cartUpdated', renderCart);
+    window.addEventListener('storage', renderCart);
 }
 
-// --- CHECKOUT PAGE FUNCTIONALITY (FIXED) ---
+// --- CHECKOUT PAGE FUNCTIONALITY ---
 function initializeCheckoutPage() {
-    const container = document.getElementById('summary-items-container');
-    if (!container) return; // only run on checkout page
-
-    const totalElement = document.getElementById('summary-total');
-    const form = document.getElementById('shipping-form');
-
-    const cart = window.KBNPrintz?.cart?.();
-    if (!cart) {
-        container.innerHTML = '<p>Cart not initialized.</p>';
-        return;
-    }
-
-    const items = cart.getItems();
-
-    if (items.length === 0) {
-        container.innerHTML = '<p style="color:red;">No products found in your cart.</p>';
-        totalElement.textContent = '₹0.00';
-        // Optional: redirect user back to cart
-        setTimeout(() => {
-            window.location.href = 'cart.html';
-        }, 2000);
-        return;
-    }
-
-    // Render items
-    container.innerHTML = items.map(item => `
-        <div class="summary-item" style="display:flex;justify-content:space-between;margin-bottom:10px;">
-            <span>${item.name} × ${item.quantity}</span>
-            <span>${item.price}</span>
-        </div>
-    `).join('');
-
-    // Show total
-    totalElement.textContent = `₹${cart.getTotal().toFixed(2)}`;
-
-    // Handle form submit
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            if (cart.getItems().length === 0) {
-                showEnhancedNotification('Your cart is empty!', 'error');
-                return;
-            }
-
-            const btn = form.querySelector('button[type="submit"]');
-            const oldText = btn.textContent;
-            btn.textContent = 'Placing Order...';
-            btn.disabled = true;
-
-            try {
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                showEnhancedNotification('✅ Order placed successfully!', 'success');
-                cart.clear();
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-            } catch {
-                showEnhancedNotification('Failed to place order.', 'error');
-            } finally {
-                btn.textContent = oldText;
-                btn.disabled = false;
-            }
-        });
-    }
- }
-{
-
+    if (!document.getElementById('summary-items-container')) return;
+    
     function renderOrderSummary() {
-        const cart = window.KBNPrintz?.cart();
+        const container = document.getElementById('summary-items-container');
         const totalElement = document.getElementById('summary-total');
+        const emptyCheckout = document.getElementById('empty-checkout-message');
+        const checkoutForm = document.getElementById('shipping-form');
+        const subtotalElement = document.getElementById('checkout-subtotal');
+        const taxElement = document.getElementById('checkout-tax');
+        const shippingElement = document.getElementById('checkout-shipping');
         
-        if (!cart || cart.getItems().length === 0) {
-            container.innerHTML = '<p>No items in cart</p>';
+        // Load cart data directly from localStorage
+        const cartItems = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+        
+        if (!cartItems || cartItems.length === 0) {
+            if (container) container.innerHTML = '<p class="text-muted">No items in cart</p>';
             if (totalElement) totalElement.textContent = '₹0.00';
-            
-            // Redirect to cart if empty
-            setTimeout(() => {
-                window.location.href = 'cart.html';
-            }, 1500);
+            if (subtotalElement) subtotalElement.textContent = '₹0.00';
+            if (taxElement) taxElement.textContent = '₹0.00';
+            if (shippingElement) shippingElement.textContent = '₹0.00';
+            if (emptyCheckout) emptyCheckout.style.display = 'block';
+            if (checkoutForm) checkoutForm.style.display = 'none';
             return;
         }
         
-        container.innerHTML = cart.getItems().map(item => `
-            <div class="summary-item">
-                <span class="item-name">${item.name} × ${item.quantity}</span>
-                <span>${item.price}</span>
-            </div>
-        `).join('');
+        if (emptyCheckout) emptyCheckout.style.display = 'none';
+        if (checkoutForm) checkoutForm.style.display = 'block';
         
-        if (totalElement) {
-            totalElement.textContent = `₹${cart.getTotal().toFixed(2)}`;
+        // Calculate totals
+        const subtotal = cartItems.reduce((sum, item) => {
+            const price = parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
+            return sum + (price * item.quantity);
+        }, 0);
+        
+        const tax = subtotal * 0.18; // 18% GST
+        const shipping = subtotal > 500 ? 0 : 50; // Free shipping above ₹500
+        const total = subtotal + tax + shipping;
+        
+        if (container) {
+            container.innerHTML = cartItems.map(item => `
+                <div class="summary-item">
+                    <span class="item-name">${item.name} ${item.custom ? '(Custom)' : ''} × ${item.quantity}</span>
+                    <span class="item-price">${item.price}</span>
+                </div>
+            `).join('');
         }
+        
+        if (subtotalElement) subtotalElement.textContent = `₹${subtotal.toFixed(2)}`;
+        if (taxElement) taxElement.textContent = `₹${tax.toFixed(2)}`;
+        if (shippingElement) shippingElement.textContent = shipping === 0 ? 'FREE' : `₹${shipping.toFixed(2)}`;
+        if (totalElement) totalElement.textContent = `₹${total.toFixed(2)}`;
     }
     
     // Handle form submission
@@ -568,88 +611,164 @@ function initializeCheckoutPage() {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const cart = window.KBNPrintz?.cart();
-            if (!cart || cart.getItems().length === 0) {
+            const cartItems = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+            if (cartItems.length === 0) {
                 showEnhancedNotification('Your cart is empty', 'error');
-                setTimeout(() => {
-                    window.location.href = 'cart.html';
-                }, 1500);
                 return;
             }
             
-            // Show loading state
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Placing Order...';
-            submitBtn.disabled = true;
+            // Validate form
+            const formData = new FormData(form);
+            const customerInfo = Object.fromEntries(formData);
+            
+            // Basic validation
+            const requiredFields = ['name', 'email', 'phone', 'address', 'city', 'pincode'];
+            const missingFields = requiredFields.filter(field => !customerInfo[field]?.trim());
+            
+            if (missingFields.length > 0) {
+                showEnhancedNotification('Please fill all required fields', 'error');
+                return;
+            }
+            
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(customerInfo.email)) {
+                showEnhancedNotification('Please enter a valid email address', 'error');
+                return;
+            }
+            
+            // Phone validation
+            const phoneRegex = /^[0-9]{10}$/;
+            const cleanPhone = customerInfo.phone.replace(/\D/g, '');
+            if (!phoneRegex.test(cleanPhone)) {
+                showEnhancedNotification('Please enter a valid 10-digit phone number', 'error');
+                return;
+            }
+            
+            // Pincode validation
+            const pincodeRegex = /^[0-9]{6}$/;
+            if (!pincodeRegex.test(customerInfo.pincode)) {
+                showEnhancedNotification('Please enter a valid 6-digit pincode', 'error');
+                return;
+            }
             
             try {
-                // Simulate order processing
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Calculate final totals
+                const subtotal = cartItems.reduce((sum, item) => {
+                    const price = parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
+                    return sum + (price * item.quantity);
+                }, 0);
+                const tax = subtotal * 0.18;
+                const shipping = subtotal > 500 ? 0 : 50;
+                const total = subtotal + tax + shipping;
                 
-                showEnhancedNotification('Order placed successfully!', 'success');
-                cart.clear();
+                // Create order data
+                const orderData = {
+                    customerInfo: customerInfo,
+                    items: cartItems,
+                    subtotal: `₹${subtotal.toFixed(2)}`,
+                    tax: `₹${tax.toFixed(2)}`,
+                    shipping: shipping === 0 ? 'FREE' : `₹${shipping.toFixed(2)}`,
+                    total: `₹${total.toFixed(2)}`,
+                    orderDate: new Date().toISOString(),
+                    orderId: 'KBN' + Date.now(),
+                    status: 'confirmed'
+                };
                 
+                // Show loading state
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Processing...';
+                submitBtn.disabled = true;
+                
+                // Save order to localStorage
+                const orders = JSON.parse(localStorage.getItem('kbnOrders')) || [];
+                orders.push(orderData);
+                localStorage.setItem('kbnOrders', JSON.stringify(orderData));
+                
+                // Try to save to Firebase if available
+                if (db) {
+                    try {
+                        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js');
+                        await setDoc(doc(db, "orders", orderData.orderId), orderData);
+                        console.log("Order saved to Firebase");
+                    } catch (firebaseError) {
+                        console.warn("Failed to save to Firebase, using localStorage only:", firebaseError);
+                    }
+                }
+                
+                // Clear cart
+                localStorage.removeItem('shoppingCart');
+                if (cart) cart.clear();
+                
+                showEnhancedNotification('Order placed successfully! Redirecting...', 'success');
+                
+                // Redirect to confirmation page
                 setTimeout(() => {
-                    window.location.href = 'index.html';
+                    window.location.href = `order-confirmation.html?orderId=${orderData.orderId}`;
                 }, 2000);
                 
             } catch (error) {
-                showEnhancedNotification('Failed to place order', 'error');
-            } finally {
+                console.error('Order processing error:', error);
+                showEnhancedNotification('Error processing order. Please try again.', 'error');
+                
+                // Reset button state
+                const submitBtn = form.querySelector('button[type="submit"]');
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
             }
         });
     }
     
+    // Render initial summary
     renderOrderSummary();
     
-    function renderOrderSummary() {
-        const cart = window.KBNPrintz?.cart();
-        const totalElement = document.getElementById('summary-total');
-        
-        if (!cart || cart.getItems().length === 0) {
-            container.innerHTML = '<p>No items in cart</p>';
-            if (totalElement) totalElement.textContent = '₹0.00';
-            return;
-        }
-        
-        container.innerHTML = cart.getItems().map(item => `
-            <div class="summary-item">
-                <span class="item-name">${item.name} × ${item.quantity}</span>
-                <span>${item.price}</span>
-            </div>
-        `).join('');
-        
-        if (totalElement) {
-            totalElement.textContent = `₹${cart.getTotal().toFixed(2)}`;
-        }
-    }
+    // Also check if user came here with empty cart
+    window.addEventListener('load', renderOrderSummary);
+}
+
+// --- ORDER CONFIRMATION PAGE ---
+function initializeOrderConfirmation() {
+    if (!window.location.pathname.includes('order-confirmation')) return;
     
-   {{
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('orderId');
+    
+    if (orderId) {
+        // Try to get order from localStorage
+        const orderData = JSON.parse(localStorage.getItem('kbnOrders'));
+        
+        if (orderData && orderData.orderId === orderId) {
+            document.getElementById('order-id')?.textContent = orderData.orderId;
+            document.getElementById('order-total')?.textContent = orderData.total;
+            document.getElementById('customer-name')?.textContent = orderData.customerInfo.name;
+            document.getElementById('customer-email')?.textContent = orderData.customerInfo.email;
+            document.getElementById('customer-phone')?.textContent = orderData.customerInfo.phone;
+            document.getElementById('customer-address')?.textContent = 
+                `${orderData.customerInfo.address}, ${orderData.customerInfo.city} - ${orderData.customerInfo.pincode}`;
             
-            try {
-                // Simulate order processing
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                showEnhancedNotification('Order placed successfully!', 'success');
-                cart.clear();
-                
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-                
-            } catch (error) {
-                showEnhancedNotification('Failed to place order', 'error');
-            } finally {
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
+            // Render order items
+            const itemsContainer = document.getElementById('order-items');
+            if (itemsContainer && orderData.items) {
+                itemsContainer.innerHTML = orderData.items.map(item => `
+                    <div class="order-item">
+                        <span>${item.name} ${item.custom ? '(Custom)' : ''} × ${item.quantity}</span>
+                        <span>${item.price}</span>
+                    </div>
+                `).join('');
             }
-        };
+        } else {
+            showEnhancedNotification('Order not found', 'error');
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 3000);
+        }
+    } else {
+        showEnhancedNotification('Invalid order reference', 'error');
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 3000);
     }
-    
-    renderOrderSummary();
 }
 
 // --- MOBILE NAVIGATION ---
@@ -661,8 +780,41 @@ function initializeMobileNavigation() {
         navToggle.addEventListener('click', () => {
             mainNav.classList.toggle('is-open');
             navToggle.classList.toggle('is-open');
+            document.body.style.overflow = mainNav.classList.contains('is-open') ? 'hidden' : '';
+        });
+        
+        // Close mobile nav when clicking on links
+        mainNav.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                mainNav.classList.remove('is-open');
+                navToggle.classList.remove('is-open');
+                document.body.style.overflow = '';
+            });
+        });
+        
+        // Close mobile nav when clicking outside
+        document.addEventListener('click', (e) => {
+            if (mainNav.classList.contains('is-open') && 
+                !mainNav.contains(e.target) && 
+                !navToggle.contains(e.target)) {
+                mainNav.classList.remove('is-open');
+                navToggle.classList.remove('is-open');
+                document.body.style.overflow = '';
+            }
         });
     }
+}
+
+// --- NETLIFY SPECIFIC FIXES ---
+function initializeNetlifyCompatibility() {
+    // Handle Netlify form submissions if any
+    const netlifyForms = document.querySelectorAll('form[data-netlify="true"]');
+    netlifyForms.forEach(form => {
+        form.addEventListener('submit', async (e) => {
+            // Let Netlify handle its own forms
+            console.log('Netlify form submission detected');
+        });
+    });
 }
 
 // --- MAIN INITIALIZATION ---
@@ -670,10 +822,17 @@ async function initializeKBNPrintz() {
     try {
         console.log('🚀 Initializing KBN Printz Store...');
         
-        // Initialize mobile navigation first
-        initializeMobileNavigation();
+        // Initialize Firebase (optional - works offline too)
+        try {
+            const firebase = await loadFirebase();
+            app = firebase.app;
+            analytics = firebase.analytics;
+            db = firebase.db;
+        } catch (error) {
+            console.log('Firebase not available, running in offline mode');
+        }
         
-        // Initialize shopping cart (doesn't depend on Firebase)
+        // Initialize shopping cart
         cart = new ShoppingCart();
         
         // Initialize AOS animations
@@ -685,23 +844,11 @@ async function initializeKBNPrintz() {
             });
         }
         
-        // Try to initialize Firebase (optional)
-        try {
-            const firebase = await loadFirebase();
-            app = firebase.app;
-            db = firebase.db;
-            analytics = firebase.analytics;
-        } catch (error) {
-            console.log('Firebase initialization skipped - running in offline mode');
-        }
+        // Initialize mobile navigation
+        initializeMobileNavigation();
         
-        // Setup global access
-        window.KBNPrintz = {
-            cart: () => cart,
-            db: () => db,
-            analytics: () => analytics,
-            showNotification: showEnhancedNotification
-        };
+        // Initialize Netlify compatibility
+        initializeNetlifyCompatibility();
         
         // Initialize page-specific functionality
         setupAddToCart();
@@ -709,23 +856,13 @@ async function initializeKBNPrintz() {
         initializeKeychainEditor();
         initializeCartPage();
         initializeCheckoutPage();
-        document.addEventListener('click', (e) => {
-    if (e.target.id === 'checkout-btn') {
-        const cart = window.KBNPrintz?.cart?.();
-        if (!cart || cart.getItems().length === 0) {
-            showEnhancedNotification('Your cart is empty!', 'error');
-            return;
-        }
-        window.location.href = 'checkout.html';
-    }
-});
-
+        initializeOrderConfirmation();
         
         console.log('✅ KBN Printz Store initialized successfully!');
         
     } catch (error) {
         console.error('❌ Initialization error:', error);
-        showEnhancedNotification('Some features may not work properly', 'warning');
+        showEnhancedNotification('Page loaded with limited functionality', 'warning');
     }
 }
 
@@ -735,3 +872,36 @@ if (document.readyState === 'loading') {
 } else {
     initializeKBNPrintz();
 }
+
+// --- GLOBAL ACCESS ---
+window.KBNPrintz = {
+    cart: () => cart,
+    showNotification: showEnhancedNotification,
+    firebase: () => ({ app, analytics, db })
+};
+
+// --- ERROR BOUNDARY ---
+window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+});
+
+// --- OFFLINE SUPPORT ---
+window.addEventListener('online', () => {
+    showEnhancedNotification('Connection restored', 'success');
+});
+
+window.addEventListener('offline', () => {
+    showEnhancedNotification('You are currently offline', 'warning');
+});
+
+// --- PAGE VISIBILITY ---
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && cart) {
+        // Refresh cart when page becomes visible
+        cart.updateUI();
+    }
+});
