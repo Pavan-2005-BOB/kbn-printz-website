@@ -652,6 +652,12 @@ function initializeCheckoutPage() {
                 return;
             }
             
+            // Show loading state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Processing...';
+            submitBtn.disabled = true;
+            
             try {
                 // Calculate final totals
                 const subtotal = cartItems.reduce((sum, item) => {
@@ -675,22 +681,14 @@ function initializeCheckoutPage() {
                     status: 'confirmed'
                 };
                 
-                // Show loading state
-                const submitBtn = form.querySelector('button[type="submit"]');
-                const originalText = submitBtn.textContent;
-                submitBtn.textContent = 'Processing...';
-                submitBtn.disabled = true;
-                
                 // Save order to localStorage
-                const orders = JSON.parse(localStorage.getItem('kbnOrders')) || [];
-                orders.push(orderData);
                 localStorage.setItem('kbnOrders', JSON.stringify(orderData));
                 
                 // Try to save to Firebase if available
                 if (db) {
                     try {
-                        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js');
-                        await setDoc(doc(db, "orders", orderData.orderId), orderData);
+                        const firestore = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js');
+                        await firestore.setDoc(firestore.doc(db, "orders", orderData.orderId), orderData);
                         console.log("Order saved to Firebase");
                     } catch (firebaseError) {
                         console.warn("Failed to save to Firebase, using localStorage only:", firebaseError);
@@ -713,7 +711,6 @@ function initializeCheckoutPage() {
                 showEnhancedNotification('Error processing order. Please try again.', 'error');
                 
                 // Reset button state
-                const submitBtn = form.querySelector('button[type="submit"]');
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
             }
