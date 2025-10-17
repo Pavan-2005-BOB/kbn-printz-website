@@ -8,7 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,7 +15,30 @@
     <header class="main-header">
         <div class="container">
             <a href="index.html" class="logo">KBN PRINTZ</a>
+            
+            <button class="nav-toggle" aria-label="toggle navigation">
+                <span class="hamburger"></span>
+            </button>
+            
+            <nav class="main-nav" id="main-nav">
+                <a href="index.html">Home</a>
+                <a href="about.html">About</a>
+                <a href="frames.html">Frames</a>
+                <a href="keychains.html">Keychains</a>
+                <a href="boards.html">Boards</a>
+                <a href="faq.html">FAQ</a>
+                <a href="contact.html">Contact</a>
+            </nav>
+
+            <div class="cart-icon-wrapper">
+                <a href="cart.html" aria-label="View shopping cart">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="bi bi-cart3" viewBox="0 0 16 16">
+                        <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM3.102 4l.84 4.479 9.144-.459L13.89 4H3.102zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                    </svg>
+                    <span class="cart-badge"></span>
+                </a>
             </div>
+        </div>
     </header>
 
     <main class="container">
@@ -48,7 +70,8 @@
                 <div class="order-summary">
                     <h3>Your Order</h3>
                     <div id="summary-items-container">
-                        </div>
+                        <!-- Order items will be populated by JavaScript -->
+                    </div>
                     <div class="summary-total">
                         <p>Total:</p>
                         <p id="summary-total">₹0.00</p>
@@ -60,12 +83,15 @@
     </main>
 
     <footer id="contact" class="main-footer">
-        <p>&copy; 2025 KBN PRINTZ. All Rights Reserved.</p>
+        <div class="container">
+            <h2>Contact Us</h2>
+            <p class="section-subtitle">Ready to place an order or have a question? Get in touch!</p>
+            <p><strong>Email:</strong> orders@kbnprintz.com | <strong>Phone:</strong> +91 8105343644</p>
+            <br>
+            <p>&copy; 2025 KBN PRINTZ. All Rights Reserved.</p>
+        </div>
     </footer>
     
-    <!-- ADD THE TWO MISSING FIREBASE SCRIPTS HERE -->
-
-    
-   <script type="module" src="script.js"></script>
+    <script type="module" src="script.js"></script>
+</body>
 </html>
-
