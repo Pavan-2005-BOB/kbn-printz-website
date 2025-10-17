@@ -250,7 +250,7 @@ h2 {
 /* Thank You & Content Pages (About, FAQ, Contact) */
 .thank-you-page, .content-page { padding: 4rem 0; background-color: var(--background-color); max-width: 800px; margin-left: auto; margin-right: auto; }
 .thank-you-content { text-align: center; }
-.thank-you-content h1, .content-page h1 { font-size: 2.5rem; color: var(--primary-color); margin-bottom: 1rem; }
+.thank-you-content h1, .content-page h2 { font-size: 2.5rem; color: var(--primary-color); margin-bottom: 1rem; }
 .thank-you-content p { font-size: 1.2rem; color: var(--text-color-muted); margin-bottom: 2rem; }
 .about-content { display: grid; grid-template-columns: 1fr 1.5fr; gap: 2rem; align-items: center; text-align: left; margin-top: 2rem; }
 .about-content img { width: 100%; border-radius: 8px; }
