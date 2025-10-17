@@ -465,18 +465,76 @@ function initializeCartPage() {
     window.addEventListener('cartUpdated', renderCart);
 }
 
-// --- CHECKOUT PAGE FUNCTIONALITY ---
-
+// --- CHECKOUT PAGE FUNCTIONALITY (FIXED) ---
 function initializeCheckoutPage() {
     const container = document.getElementById('summary-items-container');
-    if (!container) return;
-    // Add this to your existing script.js in the checkout section
+    if (!container) return; // only run on checkout page
 
-// --- CHECKOUT PAGE FUNCTIONALITY ---
-function initializeCheckoutPage() {
-    const container = document.getElementById('summary-items-container');
-    if (!container) return;
-    
+    const totalElement = document.getElementById('summary-total');
+    const form = document.getElementById('shipping-form');
+
+    const cart = window.KBNPrintz?.cart?.();
+    if (!cart) {
+        container.innerHTML = '<p>Cart not initialized.</p>';
+        return;
+    }
+
+    const items = cart.getItems();
+
+    if (items.length === 0) {
+        container.innerHTML = '<p style="color:red;">No products found in your cart.</p>';
+        totalElement.textContent = '₹0.00';
+        // Optional: redirect user back to cart
+        setTimeout(() => {
+            window.location.href = 'cart.html';
+        }, 2000);
+        return;
+    }
+
+    // Render items
+    container.innerHTML = items.map(item => `
+        <div class="summary-item" style="display:flex;justify-content:space-between;margin-bottom:10px;">
+            <span>${item.name} × ${item.quantity}</span>
+            <span>${item.price}</span>
+        </div>
+    `).join('');
+
+    // Show total
+    totalElement.textContent = `₹${cart.getTotal().toFixed(2)}`;
+
+    // Handle form submit
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (cart.getItems().length === 0) {
+                showEnhancedNotification('Your cart is empty!', 'error');
+                return;
+            }
+
+            const btn = form.querySelector('button[type="submit"]');
+            const oldText = btn.textContent;
+            btn.textContent = 'Placing Order...';
+            btn.disabled = true;
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                showEnhancedNotification('✅ Order placed successfully!', 'success');
+                cart.clear();
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            } catch {
+                showEnhancedNotification('Failed to place order.', 'error');
+            } finally {
+                btn.textContent = oldText;
+                btn.disabled = false;
+            }
+        });
+    }
+ }
+{
+
     function renderOrderSummary() {
         const cart = window.KBNPrintz?.cart();
         const totalElement = document.getElementById('summary-total');
@@ -546,7 +604,6 @@ function initializeCheckoutPage() {
     }
     
     renderOrderSummary();
-}
     
     function renderOrderSummary() {
         const cart = window.KBNPrintz?.cart();
@@ -570,23 +627,7 @@ function initializeCheckoutPage() {
         }
     }
     
-    // Handle form submission
-    const form = document.getElementById('shipping-form');
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const cart = window.KBNPrintz?.cart();
-            if (!cart || cart.getItems().length === 0) {
-                showEnhancedNotification('Your cart is empty', 'error');
-                return;
-            }
-            
-            // Show loading state
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Placing Order...';
-            submitBtn.disabled = true;
+   {{
             
             try {
                 // Simulate order processing
@@ -605,7 +646,7 @@ function initializeCheckoutPage() {
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
             }
-        });
+        };
     }
     
     renderOrderSummary();
@@ -668,6 +709,17 @@ async function initializeKBNPrintz() {
         initializeKeychainEditor();
         initializeCartPage();
         initializeCheckoutPage();
+        document.addEventListener('click', (e) => {
+    if (e.target.id === 'checkout-btn') {
+        const cart = window.KBNPrintz?.cart?.();
+        if (!cart || cart.getItems().length === 0) {
+            showEnhancedNotification('Your cart is empty!', 'error');
+            return;
+        }
+        window.location.href = 'checkout.html';
+    }
+});
+
         
         console.log('✅ KBN Printz Store initialized successfully!');
         
