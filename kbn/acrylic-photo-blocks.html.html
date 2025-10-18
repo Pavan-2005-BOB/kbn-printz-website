@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KBN PRINTZ - Contact Us</title>
+    <title>KBN PRINTZ - Acyerlic-Photo-Blocks.html</title>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <header class="main-header">
+    
+   <header class="main-header">
     <div class="container">
         <a href="index.html" class="logo">KBN PRINTZ</a>
         
@@ -38,42 +42,48 @@
         </div>
     </div>
 </header>
-    <main class="container">
-        <section class="content-page">
-            <h2>Contact Us</h2>
-            <p class="section-subtitle">Have a question or a custom request? We'd love to hear from you!</p>
-            <div class="contact-layout">
-                <form class="checkout-form" action="https://formspree.io/f/your_form_id" method="POST">
-                    <div class="form-group">
-                        <label for="full-name">Your Name</label>
-                        <input type="text" id="full-name" name="name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="email">Your Email</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="message">Message</label>
-                        <textarea id="message" name="message" rows="5" required></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Send Message</button>
-                </form>
-                <div class="contact-info">
-                    <h3>Our Info</h3>
-                    <p><strong>Email:</strong><br> orders@kbnprintz.com</p>
-                    <p><strong>Phone:</strong><br> +91 8105343644</p>
-                    <p><strong>Location:</strong><br> Bengaluru, Karnataka, India</p>
-                </div>
+
+    <section class="product-detail container">
+        <div class="product-image">
+            <img src="https://the-next-decor.com/cdn/shop/files/20_1f0da6ce-822e-4dc0-ba51-a1e6f65d9f64.jpg?crop=center&height=1800&v=1757493696&width=1800" alt="A sleek and modern metal photo frame.">
+        </div>
+
+        <div class="product-info">
+            <h1>Acrylic Photo Blocks</h1>
+            <p class="product"> Starts From </p>
+            <p class="product-price">₹1500.99</p>
+            <p class="product-description">
+               Give your favorite photos a stunning, modern showcase with our Acrylic Photo Blocks. The crystal-clear acrylic makes colors pop with incredible vibrancy, while the block's thickness creates a captivating 3D effect. Its sleek, frameless design and freestanding stability make it a perfect fit for any desk, shelf, or mantle.
+
+
+
+
+
+
+
+
+            </p>
+            
+            <div class="product-actions">
+                <label for="quantity">Quantity:</label>
+                <input type="number" id="quantity" name="quantity" min="1" value="1">
+                <button class="btn btn-primary">Add to Cart</button>
             </div>
-        </section>
-    </main>
+        </div>
+    </section>
 
-    <footer class="main-footer">
-        <p>&copy; 2025 KBN PRINTZ. All Rights Reserved.</p>
+    <footer id="contact" class="main-footer">
+        <div class="container">
+            <h2>Contact Us</h2>
+            <p class="section-subtitle">Ready to place an order or have a question? Get in touch!</p>
+            <p><strong>Email:</strong> orders@kbnprintz.com | <strong>Phone:</strong> +91 8105343644</p>
+            <br>
+            <p>&copy; 2025 KBN PRINTZ. All Rights Reserved.</p>
+        </div>
     </footer>
-
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     
+   
+     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
      <script type="module" src="script.js"></script>
 
 </body>
