@@ -1,16 +1,22 @@
 // --- 1. FIREBASE IMPORTS & CONFIGURATION ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { 
+    getFirestore, 
+    collection, 
+    addDoc, 
+    serverTimestamp 
+} from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('script.js has loaded as a module!');
+// --- DOM READY ---
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('script.js has loaded as a module! ✅');
 
-    // --- PASTE YOUR FIREBASE CONFIGURATION OBJECT HERE ---
+    // --- Firebase Configuration ---
     const firebaseConfig = {
         apiKey: "AIzaSyC4dTEmXIiGDeIpPmug7D8z1DU2-ZE6kso",
         authDomain: "kbn-printz-store.firebaseapp.com",
         projectId: "kbn-printz-store",
-        storageBucket: "kbn-printz-store.appspot.com", // CORRECTED
+        storageBucket: "kbn-printz-store.appspot.com",
         messagingSenderId: "1067786431485",
         appId: "1:1067786431485:web:83e1db7c5880d952574794"
     };
@@ -20,194 +26,407 @@ document.addEventListener('DOMContentLoaded', function() {
     const db = getFirestore(app);
     console.log("Firebase v9+ connected ✅");
 
-    // --- (All your other code remains the same) ---
+    // --- Initialize AOS and Navigation ---
     if (typeof AOS !== 'undefined') {
-        AOS.init({ once: true, duration: 800 });
+        AOS.init({ once: true, duration: 800, offset: 100 });
     }
 
     const navToggle = document.querySelector('.nav-toggle');
     const mainNav = document.querySelector('#main-nav');
-    if (navToggle) {
+    if (navToggle && mainNav) {
         navToggle.addEventListener('click', () => {
             mainNav.classList.toggle('is-open');
             navToggle.classList.toggle('is-open');
+            document.body.style.overflow = mainNav.classList.contains('is-open') ? 'hidden' : '';
         });
     }
 
-    function updateCartIcon() {
-        const cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-        const cartBadge = document.querySelector('.cart-badge');
-        let totalItems = 0;
-        cart.forEach(item => { totalItems += item.quantity; });
+    const navLinks = document.querySelectorAll('#main-nav a');
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            mainNav?.classList.remove('is-open');
+            navToggle?.classList.remove('is-open');
+            document.body.style.overflow = '';
+        });
+    });
 
-        if (cartBadge) {
-            if (totalItems > 0) {
-                cartBadge.textContent = totalItems;
-                cartBadge.classList.add('show');
-            } else {
-                cartBadge.classList.remove('show');
-            }
-        }
-    }
+    // --- 2. FORM VALIDATOR CLASS ---
+    class FormValidator {
+        static validateShippingForm(formData) {
+            const errors = {};
+            const data = {};
 
-    const addToCartButton = document.querySelector('.product-actions .btn-primary, #add-keychain-btn, #add-custom-frame-btn');
-    if (addToCartButton) {
-      addToCartButton.addEventListener('click', () => {
-        const productInfo = addToCartButton.closest('.product-info, .editor-controls');
-        const productName = productInfo.querySelector('h1').textContent;
-        const productPrice = productInfo.querySelector('.product-price').textContent;
-        const quantityInput = document.getElementById('quantity');
-        const productQuantity = quantityInput ? parseInt(quantityInput.value) : 1;
+            const name = formData.get('full-name')?.trim() || '';
+            if (!name) errors.name = 'Full name is required';
+            else if (name.length < 2) errors.name = 'Name must be at least 2 characters';
+            else data.name = name;
 
-        let productImage = '';
-        const previewCanvas = document.getElementById('preview-canvas') || document.getElementById('keychain-preview-canvas');
+            const email = formData.get('email')?.trim().toLowerCase() || '';
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!email) errors.email = 'Email is required';
+            else if (!emailRegex.test(email)) errors.email = 'Invalid email address';
+            else data.email = email;
 
-        if (previewCanvas && document.getElementById('image-upload') && document.getElementById('image-upload').files.length > 0) {
-            productImage = previewCanvas.toDataURL('image/jpeg');
-        } else {
-            const imgElement = document.querySelector('.product-image img');
-            if (imgElement) { productImage = imgElement.src; }
-        }
+            const address = formData.get('address')?.trim() || '';
+            if (!address) errors.address = 'Address is required';
+            else if (address.length < 10) errors.address = 'Enter full address (min 10 chars)';
+            else data.address = address;
 
-        if ((document.getElementById('image-upload')) && !productImage) {
-            alert('Please upload an image before adding to cart!');
-            return;
-        }
+            const phone = formData.get('phone')?.trim() || '';
+            const digitsOnly = phone.replace(/[^\d+]/g, '');
+            if (!phone) errors.phone = 'Phone number is required';
+            else if (digitsOnly.length < 10) errors.phone = 'Enter a valid phone number';
+            else data.phone = digitsOnly;
 
-        let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-        const existingProductIndex = cart.findIndex(item => item.name === productName && !item.custom);
-
-        if (existingProductIndex > -1) {
-            cart[existingProductIndex].quantity += productQuantity;
-        } else {
-            const productToAdd = {
-                name: productName,
-                price: productPrice,
-                quantity: productQuantity,
-                image: productImage,
-                custom: !!previewCanvas,
-                baseprice: productInfo.querySelector('.product') ? productInfo.querySelector('.product').textContent.trim() : null
+            return {
+                isValid: Object.keys(errors).length === 0,
+                data,
+                errors
             };
-            cart.push(productToAdd);
-        }
-
-        localStorage.setItem('shoppingCart', JSON.stringify(cart));
-        alert(`${productQuantity} x ${productName} has been added to your cart!`);
-        updateCartIcon();
-      });
-    }
-
-    const cartItemsContainer = document.getElementById('cart-items-container');
-    function renderCart() {
-        if (!cartItemsContainer) return;
-        const cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-        const emptyCartMessage = document.getElementById('empty-cart-message');
-        const cartSummary = document.getElementById('cart-summary');
-        const cartSubtotalEl = document.getElementById('cart-subtotal');
-        let subtotal = 0;
-
-        cartItemsContainer.innerHTML = '';
-
-        if (cart.length === 0) {
-            emptyCartMessage.style.display = 'block';
-            cartSummary.style.display = 'none';
-        } else {
-            emptyCartMessage.style.display = 'none';
-            cartSummary.style.display = 'flex';
-            cart.forEach((product, index) => {
-                const priceAsNumber = parseFloat(product.price.replace('₹', ''));
-                const itemTotal = priceAsNumber * product.quantity;
-                subtotal += itemTotal;
-                const cartItemHTML = `<div class="cart-item"><div class="cart-item-image"><img src="${product.image}" alt="${product.name}"></div><div class="cart-item-details"><h3>${product.name}</h3>${product.baseprice ? `<p class="base-price-text">${product.baseprice}</p>` : ''}<p>Price: ${product.price}</p></div><div class="cart-item-quantity"><input type="number" value="${product.quantity}" min="1" data-index="${index}"></div><p class="cart-item-price">₹${itemTotal.toFixed(2)}</p><button class="remove-item-btn" data-index="${index}">&times;</button></div>`;
-                cartItemsContainer.innerHTML += cartItemHTML;
-            });
-            cartSubtotalEl.textContent = `₹${subtotal.toFixed(2)}`;
         }
     }
 
-    if (cartItemsContainer) {
-        renderCart();
-        cartItemsContainer.addEventListener('click', (event) => {
-            if (event.target.classList.contains('remove-item-btn')) {
-                let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-                cart.splice(event.target.dataset.index, 1);
-                localStorage.setItem('shoppingCart', JSON.stringify(cart));
-                renderCart();
-                updateCartIcon();
+    // --- 3. SHOPPING CART MANAGER ---
+    class ShoppingCartManager {
+        constructor() {
+            this.db = db;
+            this.cart = this.getCartFromStorage();
+            this.init();
+        }
+
+        init() {
+            console.log('KBN Printz Store initialized 🛍️');
+            this.setupEventListeners();
+            this.updateCartIcon();
+        }
+
+        // Storage handling
+        getCartFromStorage() {
+            try { return JSON.parse(localStorage.getItem('shoppingCart')) || []; }
+            catch { return []; }
+        }
+        saveCartToStorage() {
+            localStorage.setItem('shoppingCart', JSON.stringify(this.cart));
+        }
+
+        // Cart functions
+        addToCart(product) {
+            if (product.custom) this.cart.push(product);
+            else {
+                const index = this.cart.findIndex(p => p.name === product.name && !p.custom);
+                if (index > -1) this.cart[index].quantity += product.quantity;
+                else this.cart.push(product);
             }
-        });
-        cartItemsContainer.addEventListener('change', (event) => {
-            if (event.target.matches('input[type="number"]')) {
-                let cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-                const index = event.target.dataset.index;
-                const newQuantity = parseInt(event.target.value);
-                if (newQuantity > 0) {
-                    cart[index].quantity = newQuantity;
-                } else {
-                    cart.splice(index, 1);
-                }
-                localStorage.setItem('shoppingCart', JSON.stringify(cart));
-                renderCart();
-                updateCartIcon();
-            }
-        });
-    }
-
-    // --- Checkout Page Logic (UPGRADED FOR FIREBASE V9+) ---
-    const summaryItemsContainer = document.getElementById('summary-items-container');
-    if (summaryItemsContainer) {
-        const cart = JSON.parse(localStorage.getItem('shoppingCart')) || [];
-        const summaryTotalEl = document.getElementById('summary-total');
-        let subtotal = 0;
-
-        if (cart.length > 0) {
-            cart.forEach(product => {
-                const priceAsNumber = parseFloat(product.price.replace('₹', ''));
-                const itemTotal = priceAsNumber * product.quantity;
-                subtotal += itemTotal;
-                const summaryItemHTML = `<div class="summary-item"><span class="item-name">${product.name} (x${product.quantity})</span><span class="item-price">₹${itemTotal.toFixed(2)}</span></div>`;
-                summaryItemsContainer.innerHTML += summaryItemHTML;
-            });
-            summaryTotalEl.textContent = `₹${subtotal.toFixed(2)}`;
+            this.saveCartToStorage();
+            this.updateCartIcon();
+            this.showNotification(`${product.quantity} x ${product.name} added to cart!`, 'success');
         }
 
-        const shippingForm = document.getElementById('shipping-form');
-        shippingForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            
-            if (cart.length === 0) {
-                alert("Your cart is empty. Please add items before placing an order.");
+        removeFromCart(index) {
+            if (index >= 0 && index < this.cart.length) {
+                this.cart.splice(index, 1);
+                this.saveCartToStorage();
+                this.updateCartIcon();
+                this.showNotification('Item removed from cart', 'info');
+                return true;
+            }
+            return false;
+        }
+
+        updateQuantity(index, newQty) {
+            if (index >= 0 && index < this.cart.length) {
+                if (newQty > 0) this.cart[index].quantity = newQty;
+                else this.removeFromCart(index);
+                this.saveCartToStorage();
+                this.updateCartIcon();
+            }
+        }
+
+        getCartTotal() {
+            return this.cart.reduce((sum, p) => sum + (parseFloat(p.price.replace('₹','')) * p.quantity), 0);
+        }
+
+        clearCart() {
+            this.cart = [];
+            this.saveCartToStorage();
+            this.updateCartIcon();
+        }
+
+        updateCartIcon() {
+            const badge = document.querySelector('.cart-badge');
+            if (!badge) return;
+            const total = this.cart.reduce((s, i) => s + i.quantity, 0);
+            if (total > 0) {
+                badge.textContent = total > 99 ? '99+' : total;
+                badge.classList.add('show');
+            } else badge.classList.remove('show');
+        }
+
+        // Notifications
+        showNotification(msg, type='info') {
+            const existing = document.querySelector('.custom-notification');
+            if (existing) existing.remove();
+
+            const note = document.createElement('div');
+            note.className = `custom-notification custom-notification--${type}`;
+            note.innerHTML = `
+                <span class="custom-notification__message">${msg}</span>
+                <button class="custom-notification__close">&times;</button>
+            `;
+            if (!document.querySelector('#notification-styles')) this.injectNotificationStyles();
+            document.body.appendChild(note);
+
+            requestAnimationFrame(() => note.classList.add('custom-notification--show'));
+            const timer = setTimeout(() => this.removeNotification(note), 5000);
+            note.querySelector('.custom-notification__close').addEventListener('click', () => {
+                clearTimeout(timer);
+                this.removeNotification(note);
+            });
+        }
+
+        removeNotification(note) {
+            note.classList.remove('custom-notification--show');
+            setTimeout(() => note.remove(), 300);
+        }
+
+        injectNotificationStyles() {
+  const css = `
+  .custom-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    border-left: 4px solid var(--color-border);
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all var(--transition-normal);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    max-width: 400px;
+  }
+
+  .custom-notification--show {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .custom-notification--success {
+    border-left-color: var(--color-success);
+  }
+  .custom-notification--error {
+    border-left-color: var(--color-error);
+  }
+  .custom-notification--info {
+    border-left-color: var(--color-info);
+  }
+
+  .custom-notification__message {
+    flex: 1;
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .custom-notification__close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    padding: 0;
+    line-height: 1;
+    transition: color var(--transition-normal);
+  }
+
+  .custom-notification__close:hover {
+    color: var(--color-error);
+  }
+
+  .btn-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 8px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  `;
+  
+  const style = document.createElement('style');
+  style.id = 'notification-styles';
+  style.textContent = css;
+  document.head.appendChild(style);
+        }
+
+        // Rendering
+        renderCart() {
+            const container = document.getElementById('cart-items-container');
+            if (!container) return;
+            const emptyMsg = document.getElementById('empty-cart-message');
+            const summary = document.getElementById('cart-summary');
+            const subtotalEl = document.getElementById('cart-subtotal');
+
+            container.innerHTML = '';
+            if (this.cart.length === 0) {
+                emptyMsg.style.display = 'block';
+                summary.style.display = 'none';
                 return;
             }
 
-            const shippingDetails = {
-                name: document.getElementById('full-name').value,
-                email: document.getElementById('email').value,
-                address: document.getElementById('address').value,
-                phone: document.getElementById('phone').value,
-            };
+            emptyMsg.style.display = 'none';
+            summary.style.display = 'flex';
 
-            const order = {
-                shipping: shippingDetails,
-                items: cart,
-                total: subtotal,
-                createdAt: new Date()
-            };
+            this.cart.forEach((p, i) => {
+                const priceNum = parseFloat(p.price.replace('₹', '')) || 0;
+                const itemTotal = priceNum * p.quantity;
+                container.innerHTML += `
+                    <div class="cart-item" data-index="${i}">
+                        <div class="cart-item-image"><img src="${p.image}" alt="${p.name}" loading="lazy"></div>
+                        <div class="cart-item-details">
+                            <h3>${this.escapeHtml(p.name)}</h3>
+                            ${p.baseprice ? `<p class="base-price-text">${this.escapeHtml(p.baseprice)}</p>` : ''}
+                            <p>Price: ${p.price}</p>
+                            ${p.custom ? '<p class="custom-badge">Custom Design</p>' : ''}
+                        </div>
+                        <div class="cart-item-quantity"><input type="number" value="${p.quantity}" min="1" data-index="${i}"></div>
+                        <p class="cart-item-total">₹${itemTotal.toFixed(2)}</p>
+                        <button class="remove-item-btn" data-index="${i}">&times;</button>
+                    </div>
+                `;
+            });
+            if (subtotalEl) subtotalEl.textContent = `₹${this.getCartTotal().toFixed(2)}`;
+        }
 
-            try {
-                // Save the order to a new "orders" collection in Firestore
-                await addDoc(collection(db, "orders"), order);
-                
-                localStorage.removeItem('shoppingCart');
-                alert('Order placed successfully! Thank you for your purchase.');
-                window.location.href = 'thank-you.html';
+        renderOrderSummary() {
+            const container = document.getElementById('summary-items-container');
+            const totalEl = document.getElementById('summary-total');
+            if (!container) return;
+            container.innerHTML = '';
+            this.cart.forEach(p => {
+                const total = parseFloat(p.price.replace('₹','')) * p.quantity;
+                container.innerHTML += `<div class="summary-item">
+                    <span class="item-name">${this.escapeHtml(p.name)} (x${p.quantity})</span>
+                    <span class="item-price">₹${total.toFixed(2)}</span></div>`;
+            });
+            if (totalEl) totalEl.textContent = `₹${this.getCartTotal().toFixed(2)}`;
+        }
 
-            } catch (error) {
-                console.error("Error writing document: ", error);
-                alert("There was an error placing your order. Please try again.");
+        escapeHtml(txt) {
+            return txt.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+        }
+
+        // Events
+        setupEventListeners() {
+            this.setupAddToCartHandler();
+            this.setupCartHandlers();
+            this.setupCheckoutHandler();
+        }
+
+        setupAddToCartHandler() {
+            const btn = document.querySelector('.product-actions .btn-primary, #add-keychain-btn, #add-custom-frame-btn');
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                const productData = this.getProductDataFromForm();
+                if (productData) this.addToCart(productData);
+            });
+        }
+
+        getProductDataFromForm() {
+            const btn = document.querySelector('.product-actions .btn-primary, #add-keychain-btn, #add-custom-frame-btn');
+            const info = btn?.closest('.product-info, .editor-controls');
+            if (!info) return null;
+
+            const name = info.querySelector('h1')?.textContent || 'Unnamed Product';
+            const price = info.querySelector('.product-price')?.textContent || '₹0.00';
+            const qty = parseInt(document.getElementById('quantity')?.value) || 1;
+            const canvas = document.getElementById('preview-canvas') || document.getElementById('keychain-preview-canvas');
+            let img = '';
+            if (canvas && document.getElementById('image-upload')?.files.length > 0) img = canvas.toDataURL('image/jpeg', 0.9);
+            else img = document.querySelector('.product-image img')?.src || '';
+
+            if (document.getElementById('image-upload') && !img) {
+                this.showNotification('Please upload an image before adding to cart!', 'error');
+                return null;
             }
-        });
+
+            return { name, price, quantity: qty, image: img, custom: !!canvas, baseprice: info.querySelector('.product')?.textContent?.trim() || null };
+        }
+
+        setupCartHandlers() {
+            const container = document.getElementById('cart-items-container');
+            if (!container) return;
+            this.renderCart();
+
+            container.addEventListener('click', e => {
+                if (e.target.classList.contains('remove-item-btn')) {
+                    const i = parseInt(e.target.dataset.index);
+                    this.removeFromCart(i);
+                    this.renderCart();
+                }
+            });
+
+            container.addEventListener('change', e => {
+                if (e.target.matches('input[type="number"]')) {
+                    const i = parseInt(e.target.dataset.index);
+                    const q = parseInt(e.target.value) || 1;
+                    this.updateQuantity(i, q);
+                    this.renderCart();
+                }
+            });
+        }
+
+        setupCheckoutHandler() {
+            const form = document.getElementById('shipping-form');
+            if (!form) return;
+            this.renderOrderSummary();
+
+            form.addEventListener('submit', async e => {
+                e.preventDefault();
+                if (this.cart.length === 0) return this.showNotification('Your cart is empty!', 'error');
+
+                const result = FormValidator.validateShippingForm(new FormData(form));
+                if (!result.isValid) return this.showNotification('Please fill all required fields correctly.', 'error');
+
+                const order = {
+                    shipping: result.data,
+                    items: this.cart,
+                    total: this.getCartTotal(),
+                    createdAt: serverTimestamp(),
+                    status: 'pending',
+                    orderId: 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase()
+                };
+
+                const btn = form.querySelector('button[type="submit"]');
+                const originalText = btn.textContent;
+                btn.innerHTML = '<div class="btn-spinner"></div> Placing Order...';
+                btn.disabled = true;
+
+                try {
+                    await addDoc(collection(this.db, "orders"), order);
+                    this.clearCart();
+                    this.showNotification('Order placed successfully! Thank you 🎉', 'success');
+                    setTimeout(() => window.location.href = 'thank-you.html', 2000);
+                } catch (err) {
+                    console.error(err);
+                    this.showNotification('Error placing order. Try again.', 'error');
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            });
+        }
     }
 
-    updateCartIcon();
+    // --- 4. INITIALIZE APP ---
+    new ShoppingCartManager();
 });
