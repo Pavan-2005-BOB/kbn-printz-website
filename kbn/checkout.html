@@ -14,19 +14,60 @@
 
   <header class="main-header">
     <div class="container">
-      <a href="index.html" class="logo">KBN PRINTZ</a>
+        <a href="index.html" class="logo">KBN PRINTZ</a>
 
-      <nav class="main-nav">
-        <a href="index.html">Home</a>
-        <a href="about.html">About</a>
-        <a href="frames.html">Frames</a>
-        <a href="keychains.html">Keychains</a>
-        <a href="boards.html">Boards</a>
-        <a href="faq.html">FAQ</a>
-        <a href="contact.html">Contact</a>
-      </nav>
+        <!-- Hamburger Menu Button -->
+        <button class="nav-toggle" aria-label="Toggle navigation">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+        <nav class="main-nav">
+            <a href="index.html">Home</a>
+            <a href="about.html">About</a>
+            
+            <!-- Products Dropdown -->
+            <div class="nav-dropdown">
+                <a href="#" class="nav-dropdown-toggle">Products <i class="fas fa-chevron-down"></i></a>
+                <div class="nav-dropdown-menu">
+                    <a href="frames.html">Frames</a>
+                    <a href="keychains.html">Keychains</a>
+                    <a href="boards.html">Boards</a>
+                    <a href="3d-logo-sign.html">3D Logo Signs</a>
+                    <a href="custom-wall-art.html">Wall Art</a>
+                    <a href="event-signage.html">Event Signage</a>
+                </div>
+            </div>
+            
+            <!-- Customize Dropdown -->
+            <div class="nav-dropdown">
+                <a href="#" class="nav-dropdown-toggle">Customize <i class="fas fa-chevron-down"></i></a>
+                <div class="nav-dropdown-menu">
+                    <a href="frame-editor.html">Custom Frame</a>
+                    <a href="keychain-editor.html">Custom Keychain</a>
+                    <a href="logo-keychain.html">Logo Keychain</a>
+                    <a href="photo-keychain.html">Photo Keychain</a>
+                    <a href="custom-shape-keychain.html">Shape Keychain</a>
+                </div>
+            </div>
+            
+            <a href="faq.html">FAQ</a>
+            <a href="contact.html">Contact</a>
+            
+            <!-- Cart Icon -->
+            <div class="nav-cart">
+                <a href="cart.html" class="cart-link">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span class="cart-badge">0</span>
+                </a>
+            </div>
+        </nav>
     </div>
-  </header>
+</header>
+
+<!-- Mobile Menu Overlay -->
+<div class="nav-overlay"></div>
 
   <main class="container">
     <section class="checkout-page">
@@ -36,26 +77,33 @@
         <div class="shipping-details">
           <h3>Shipping Information</h3>
           <form id="shipping-form" class="checkout-form">
-            <div class="form-group">
+           <div class="form-group">
               <label for="full-name">Full Name</label>
-              <input type="text" id="full-name" required>
+              <input type="text" id="full-name" name="name" required>
             </div>
             <div class="form-group">
               <label for="email">Email</label>
-              <input type="email" id="email" required>
+              <input type="email" id="email" name="email" required>
             </div>
             <div class="form-group">
               <label for="address">Address</label>
-              <input type="text" id="address" required>
+              <input type="text" id="address" name="address" required>
             </div>
-            <div class="form-group">
+           <div class="form-group">
               <label for="phone">Phone Number</label>
-              <input type="tel" id="phone" required>
+              <input type="tel" id="phone" name="phone" required>
+            </div>
+
+            <div class="form-group">
+              <label for="city">City</label>
+              <input type="text" id="city" name="city" required>
+            </div>
+
+            <div class="form-group">
+              <label for="pincode">Pincode</label>
+              <input type="text" id="pincode" name="pincode" required pattern="[0-9]{6}" maxlength="6">
             </div>
             <button type="submit" class="btn btn-primary">Place Order</button>
-          </form>
-        </div>
-
         <!-- RIGHT: ORDER SUMMARY -->
         <div class="order-summary">
           <h3>Your Order</h3>
@@ -76,7 +124,7 @@
       <p>&copy; 2025 KBN PRINTZ. All Rights Reserved.</p>
     </div>
   </footer>
-
-  <script src="checkout.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+   <script type="module" src="script.js"></script>
 </body>
 </html>

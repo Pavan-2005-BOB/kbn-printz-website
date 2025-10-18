@@ -69,6 +69,50 @@ function showEnhancedNotification(message, type = 'success', duration = 4000) {
         `;
         document.body.appendChild(container);
     }
+    // Enhanced mobile cart interactions
+function enhanceMobileCart() {
+    // Add touch feedback to buttons
+    const buttons = document.querySelectorAll('.cart-item button, #proceed-to-checkout, #continue-shopping');
+    buttons.forEach(button => {
+        button.addEventListener('touchstart', function() {
+            this.style.transform = 'scale(0.95)';
+        });
+        
+        button.addEventListener('touchend', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+    
+    // Improve quantity input for mobile
+    const quantityInputs = document.querySelectorAll('.cart-item-quantity input');
+    quantityInputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.style.backgroundColor = '#f8fafc';
+            this.style.borderColor = '#3b82f6';
+        });
+        
+        input.addEventListener('blur', function() {
+            this.style.backgroundColor = 'white';
+            this.style.borderColor = '#d1d5db';
+        });
+    });
+    
+    // Prevent zoom on input focus (iOS)
+    quantityInputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            setTimeout(() => {
+                document.body.style.zoom = "100%";
+            }, 100);
+        });
+    });
+}
+
+// Initialize when cart is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('cart-items-container')) {
+        setTimeout(enhanceMobileCart, 500);
+    }
+});
     
     const toast = document.createElement('div');
     
@@ -288,6 +332,7 @@ function handleImageUpload(event, callback) {
 }
 
 // --- CANVAS UTILITIES ---
+
 function initializeCanvas(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return null;
@@ -674,16 +719,16 @@ function initializeCheckoutPage() {
                 
                 localStorage.setItem('kbnOrders', JSON.stringify(orderData));
                 
-                if (db) {
-                    try {
-                        const firestore = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js');
-                        await firestore.setDoc(firestore.doc(db, "orders", orderData.orderId), orderData);
-                        console.log("Order saved to Firebase");
-                    } catch (firebaseError) {
-                        console.warn("Failed to save to Firebase:", firebaseError);
-                    }
-                }
-                
+               if (db) {
+    try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js');
+        const docRef = doc(db, "orders", orderData.orderId);
+        await setDoc(docRef, orderData);
+        console.log("Order saved to Firebase");
+    } catch (firebaseError) {
+        console.warn("Failed to save to Firebase:", firebaseError);
+    }
+}
                 localStorage.removeItem('shoppingCart');
                 if (cart) cart.clear();
                 
@@ -804,6 +849,196 @@ function initializeNetlifyCompatibility() {
 }
 
 // --- MAIN INITIALIZATION ---
+// Enhanced Navigation for All Pages
+function initEnhancedNavigation() {
+    const navToggle = document.querySelector('.nav-toggle');
+    const mainNav = document.querySelector('.main-nav');
+    const navOverlay = document.querySelector('.nav-overlay');
+    const body = document.body;
+
+    // Mobile Menu Toggle
+    if (navToggle && mainNav) {
+        navToggle.addEventListener('click', function() {
+            const isOpen = mainNav.classList.toggle('is-open');
+            navToggle.classList.toggle('is-open');
+            navOverlay?.classList.toggle('is-open');
+            body.classList.toggle('menu-open', isOpen);
+        });
+
+        // Close menu when clicking overlay
+        if (navOverlay) {
+            navOverlay.addEventListener('click', closeMobileMenu);
+        }
+
+        // Mobile dropdown functionality
+        const dropdownToggles = mainNav.querySelectorAll('.nav-dropdown-toggle');
+        dropdownToggles.forEach(toggle => {
+            toggle.addEventListener('click', function(e) {
+                if (window.innerWidth <= 768) {
+                    e.preventDefault();
+                    const dropdown = this.parentElement;
+                    dropdown.classList.toggle('active');
+                    
+                    // Close other dropdowns
+                    dropdownToggles.forEach(otherToggle => {
+                        if (otherToggle !== this) {
+                            otherToggle.parentElement.classList.remove('active');
+                        }
+                    });
+                }
+            });
+        });
+
+        // Close menu when clicking navigation links
+        mainNav.querySelectorAll('a').forEach(link => {
+            if (!link.classList.contains('nav-dropdown-toggle')) {
+                link.addEventListener('click', closeMobileMenu);
+            }
+        });
+
+        // Close menu on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMobileMenu();
+            }
+        });
+    }
+
+    function closeMobileMenu() {
+        mainNav?.classList.remove('is-open');
+        navToggle?.classList.remove('is-open');
+        navOverlay?.classList.remove('is-open');
+        body.classList.remove('menu-open');
+        
+        // Close all mobile dropdowns
+        document.querySelectorAll('.nav-dropdown').forEach(dropdown => {
+            dropdown.classList.remove('active');
+        });
+    }
+}
+
+// Cart Management for All Pages
+function initCartSystem() {
+    // Update cart badge on all pages
+    function updateCartBadge() {
+        const cartBadges = document.querySelectorAll('.cart-badge');
+        cartBadges.forEach(badge => {
+            try {
+                const cartItems = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+                const totalItems = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                badge.textContent = totalItems;
+                badge.style.display = totalItems > 0 ? 'flex' : 'none';
+            } catch (error) {
+                console.error('Error updating cart badge:', error);
+                badge.style.display = 'none';
+            }
+        });
+    }
+
+    // Add to cart functionality for all product pages
+    function setupAddToCart() {
+        document.addEventListener('click', function(e) {
+            const addToCartBtn = e.target.closest('.btn-primary, .add-to-cart, [id*="add"]');
+            
+            if (addToCartBtn && (addToCartBtn.textContent.includes('Add to Cart') || 
+                                addToCartBtn.textContent.includes('Cart') ||
+                                addToCartBtn.id.includes('add'))) {
+                e.preventDefault();
+                
+                // Get product info based on page type
+                const productInfo = getProductInfo();
+                if (productInfo) {
+                    addToCart(productInfo);
+                }
+            }
+        });
+    }
+
+    function getProductInfo() {
+        // Get product info based on current page
+        const path = window.location.pathname;
+        const page = path.split('/').pop();
+        
+        let productInfo = {
+            name: 'Custom Product',
+            price: '₹0.00',
+            quantity: 1,
+            image: '',
+            custom: false,
+            page: page
+        };
+
+        // Product-specific logic
+        if (page.includes('frame')) {
+            productInfo.name = document.querySelector('h1, h2')?.textContent || 'Custom Frame';
+            productInfo.price = document.querySelector('.price, .product-price')?.textContent || '₹299.00';
+            productInfo.image = document.querySelector('.product-image img, .preview-image')?.src || '';
+            productInfo.custom = page.includes('editor');
+        }
+        else if (page.includes('keychain')) {
+            productInfo.name = document.querySelector('h1, h2')?.textContent || 'Custom Keychain';
+            productInfo.price = document.querySelector('.price, .product-price')?.textContent || '₹199.00';
+            productInfo.image = document.querySelector('.product-image img, .preview-image')?.src || '';
+            productInfo.custom = page.includes('editor') || page.includes('custom');
+        }
+        else if (page.includes('sign') || page.includes('art') || page.includes('board')) {
+            productInfo.name = document.querySelector('h1, h2')?.textContent || document.title;
+            productInfo.price = document.querySelector('.price, .product-price')?.textContent || '₹499.00';
+            productInfo.image = document.querySelector('.product-image img')?.src || '';
+        }
+
+        return productInfo;
+    }
+
+    function addToCart(productInfo) {
+        try {
+            const cartItems = JSON.parse(localStorage.getItem('shoppingCart')) || [];
+            
+            // Check if product already exists
+            const existingIndex = cartItems.findIndex(item => 
+                item.name === productInfo.name && item.page === productInfo.page
+            );
+            
+            if (existingIndex > -1) {
+                cartItems[existingIndex].quantity += productInfo.quantity;
+            } else {
+                productInfo.id = Date.now().toString();
+                cartItems.push(productInfo);
+            }
+            
+            localStorage.setItem('shoppingCart', JSON.stringify(cartItems));
+            updateCartBadge();
+            
+            // Show success message
+            showNotification(`${productInfo.name} added to cart!`, 'success');
+            
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            showNotification('Error adding product to cart', 'error');
+        }
+    }
+
+    // Initialize
+    updateCartBadge();
+    setupAddToCart();
+    
+    // Update cart when storage changes (other tabs)
+    window.addEventListener('storage', updateCartBadge);
+}
+
+// Notification System
+function showNotification(message, type = 'success') {
+    // Your existing notification code here
+    console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
+// Initialize everything when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initEnhancedNavigation();
+    initCartSystem();
+    
+    console.log('✅ KBN Printz enhanced navigation initialized');
+});
 async function initializeKBNPrintz() {
     try {
         console.log('🚀 Initializing KBN Printz Store...');
