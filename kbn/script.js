@@ -309,21 +309,80 @@ class ShoppingCartManager {
                 return;
             }
 
-            // Basic form validation
-            const formData = new FormData(shippingForm);
-            const shippingDetails = {
-                name: formData.get('full-name')?.toString().trim(),
-                email: formData.get('email')?.toString().trim(),
-                address: formData.get('address')?.toString().trim(),
-                phone: formData.get('phone')?.toString().trim(),
-            };
-
         
+          class FormValidator {
+    static validateShippingForm(formData) {
+        const errors = {};
+        const data = {};
 
-            if (!this.isValidEmail(shippingDetails.email)) {
-                alert('Please enter a valid email address.');
-                return;
-            }
+        // Name validation
+        const name = formData.get('full-name')?.toString().trim() || '';
+        if (!name) {
+            errors.name = 'Full name is required';
+        } else if (name.length < 2) {
+            errors.name = 'Name must be at least 2 characters';
+        } else if (name.length > 100) {
+            errors.name = 'Name must be less than 100 characters';
+        } else {
+            data.name = name.replace(/\s+/g, ' ');
+        }
+
+        // Email validation
+        const email = formData.get('email')?.toString().trim().toLowerCase() || '';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email) {
+            errors.email = 'Email is required';
+        } else if (!emailRegex.test(email)) {
+            errors.email = 'Please enter a valid email address';
+        } else if (email.length > 254) {
+            errors.email = 'Email must be less than 254 characters';
+        } else {
+            data.email = email;
+        }
+
+        // Address validation
+        const address = formData.get('address')?.toString().trim() || '';
+        if (!address) {
+            errors.address = 'Address is required';
+        } else if (address.length < 10) {
+            errors.address = 'Please enter a complete address';
+        } else if (address.length > 500) {
+            errors.address = 'Address must be less than 500 characters';
+        } else {
+            data.address = address.replace(/\s+/g, ' ');
+        }
+
+        // Phone validation
+        const phone = formData.get('phone')?.toString().trim() || '';
+        const digitsOnly = phone.replace(/[^\d+]/g, '');
+        if (!phone) {
+            errors.phone = 'Phone number is required';
+        } else if (digitsOnly.length < 10) {
+            errors.phone = 'Please enter a valid phone number';
+        } else if (digitsOnly.length > 15) {
+            errors.phone = 'Phone number is too long';
+        } else {
+            data.phone = digitsOnly;
+        }
+
+        return {
+            isValid: Object.keys(errors).length === 0,
+            data,
+            errors
+        };
+    }
+}
+
+// Usage in your checkout handler
+const validationResult = FormValidator.validateShippingForm(formData);
+
+if (!validationResult.isValid) {
+    // Show errors to user
+    this.displayFormErrors(validationResult.errors);
+    return;
+}
+
+const shippingDetails = validationResult.data;
 
             const order = {
                 shipping: shippingDetails,
