@@ -318,11 +318,7 @@ class ShoppingCartManager {
                 phone: formData.get('phone')?.toString().trim(),
             };
 
-            // Validation
-            if (!shippingDetails.name || !shippingDetails.email || !shippingDetails.address || !shippingDetails.phone) {
-                alert('Please fill in all shipping details.');
-                return;
-            }
+        
 
             if (!this.isValidEmail(shippingDetails.email)) {
                 alert('Please enter a valid email address.');
